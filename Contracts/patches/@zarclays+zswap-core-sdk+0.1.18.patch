@@ -1,0 +1,15 @@
+diff --git a/node_modules/@zarclays/zswap-core-sdk/package.json b/node_modules/@zarclays/zswap-core-sdk/package.json
+index 50d77d0..68bc38f 100644
+--- a/node_modules/@zarclays/zswap-core-sdk/package.json
++++ b/node_modules/@zarclays/zswap-core-sdk/package.json
+@@ -2,8 +2,9 @@
+   "name": "@zarclays/zswap-core-sdk",
+   "version": "0.1.18",
+   "license": "MIT",
+-  "main": "dist/index.js",
++  "main": "dist/zswap-core-sdk.esm.js",
+   "typings": "dist/index.d.ts",
++  "type":"module",
+   "files": [
+     "dist"
+   ],

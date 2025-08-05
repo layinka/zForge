@@ -1,0 +1,48 @@
+.btn-switch {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bs-body-bg);
+  border: 2px solid var(--bs-border-color);
+  border-radius: 50%;
+  color: var(--bs-body-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: -20px auto 0;
+  position: relative;
+  z-index: 2;
+  
+  &:hover:not(.disabled) {
+    background-color: var(--bs-gray-100);
+    transform: rotate(180deg);
+    border-color: var(--bs-primary);
+    color: var(--bs-primary);
+  }
+  
+  &:active:not(.disabled) {
+    transform: rotate(180deg) scale(0.95);
+  }
+  
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  i {
+    font-size: 1.25rem;
+    transition: inherit;
+  }
+  
+  // Animation for the switch effect
+  &.switch-animation {
+    animation: spin 0.3s ease-in-out;
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(180deg); }
+}

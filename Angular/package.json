@@ -1,0 +1,61 @@
+{
+  "name": "stellar-fusion-frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "prettier": {
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "^20.1.4",
+    "@angular/common": "^20.1.0",
+    "@angular/compiler": "^20.1.0",
+    "@angular/core": "^20.1.0",
+    "@angular/forms": "^20.1.0",
+    "@angular/platform-browser": "^20.1.0",
+    "@angular/router": "^20.1.0",
+    "@ng-bootstrap/ng-bootstrap": "^19.0.1",
+    "@ng-icons/bootstrap-icons": "^32.1.0",
+    "@ng-icons/core": "^32.1.0",
+    "@ng-icons/heroicons": "^32.1.0",
+    "@ng-icons/material-file-icons": "^32.1.0",
+    "@popperjs/core": "^2.11.8",
+    "@reown/appkit": "^1.7.17",
+    "@reown/appkit-adapter-wagmi": "^1.7.17",
+    "@stellar/freighter-api": "^4.1.0",
+    "@wagmi/core": "^2.18.0",
+    "bootstrap": "^5.3.6",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "viem": "^2.33.2",
+    "wagmi": "^2.16.0",
+    "zone.js": "~0.15.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^20.1.4",
+    "@angular/cli": "^20.1.4",
+    "@angular/compiler-cli": "^20.1.0",
+    "@angular/localize": "^20.1.0",
+    "@types/jasmine": "~5.1.0",
+    "jasmine-core": "~5.8.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "typescript": "~5.8.2"
+  }
+}

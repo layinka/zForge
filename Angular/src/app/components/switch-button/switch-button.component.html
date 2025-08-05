@@ -1,0 +1,10 @@
+<button 
+  class="btn-switch"
+  [class.disabled]="disabled()"
+  (click)="onClick()"
+  [attr.aria-label]="'Switch tokens'"
+  [attr.aria-disabled]="disabled()"
+  [title]="'Switch tokens'"
+>
+  <i class="bi bi-arrow-down-up"></i>
+</button>

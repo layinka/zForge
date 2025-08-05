@@ -1,0 +1,273 @@
+<div class="row">
+  <div class="col-12">
+    <div class="text-center mb-5">
+      <h1 class="gradient-text display-4 fw-bold">PT & YT Management</h1>
+      <p class="lead text-muted">
+        Manage your Principal and Yield tokens - merge, redeem, and claim yields
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- PT/YT Balances -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="mb-0">
+          <i class="bi bi-wallet me-2"></i>
+          Your PT & YT Tokens
+        </h4>
+      </div>
+      <div class="card-body">
+        <!-- PT Tokens -->
+        <div class="mb-4">
+          <h5 class="text-primary mb-3">
+            <i class="bi bi-shield-check me-2"></i>
+            Principal Tokens (PT)
+          </h5>
+          @if (tokenService.ptTokens().length > 0) {
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Token</th>
+                    <th>Balance</th>
+                    <th>Maturity</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (ptToken of tokenService.ptTokens(); track ptToken.address) {
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center">
+                          <span class="token-badge bg-primary me-2">{{ ptToken.symbol }}</span>
+                          {{ ptToken.name }}
+                        </div>
+                      </td>
+                      <td>{{ blockchainService.formatBalance(ptToken.balance) }}</td>
+                      <td>{{ getPTMaturity(ptToken.address) }}</td>
+                      <td>
+                        @if (isPTMatured(ptToken.address)) {
+                          <span class="badge bg-success">Redeemable</span>
+                        } @else {
+                          <span class="badge bg-warning">Locked</span>
+                        }
+                      </td>
+                      <td>
+                        @if (isPTMatured(ptToken.address) && parseFloat(ptToken.balance) > 0) {
+                          <button 
+                            class="btn btn-success btn-sm"
+                            (click)="redeemPT(ptToken.address)"
+                            [disabled]="isProcessing()">
+                            Redeem
+                          </button>
+                        } @else {
+                          <span class="text-muted">-</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="text-center py-4">
+              <i class="bi bi-inbox display-1 text-muted"></i>
+              <p class="text-muted mt-2">No PT tokens found</p>
+            </div>
+          }
+        </div>
+
+        <!-- YT Tokens -->
+        <div>
+          <h5 class="text-warning mb-3">
+            <i class="bi bi-graph-up me-2"></i>
+            Yield Tokens (YT)
+          </h5>
+          @if (tokenService.ytTokens().length > 0) {
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Token</th>
+                    <th>Balance</th>
+                    <th>Claimable Yield</th>
+                    <th>Expiry</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (ytToken of tokenService.ytTokens(); track ytToken.address) {
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center">
+                          <span class="token-badge bg-warning me-2">{{ ytToken.symbol }}</span>
+                          {{ ytToken.name }}
+                        </div>
+                      </td>
+                      <td>{{ blockchainService.formatBalance(ytToken.balance) }}</td>
+                      <td>
+                        <span class="text-success fw-semibold">
+                          {{ getYTClaimableYield(ytToken.address) }}
+                        </span>
+                      </td>
+                      <td>{{ getYTExpiry(ytToken.address) }}</td>
+                      <td>
+                        @if (isYTExpired(ytToken.address)) {
+                          <span class="badge bg-danger">Expired</span>
+                        } @else {
+                          <span class="badge bg-success">Active</span>
+                        }
+                      </td>
+                      <td>
+                        @if (!isYTExpired(ytToken.address) && parseFloat(getYTClaimableYield(ytToken.address)) > 0) {
+                          <button 
+                            class="btn btn-warning btn-sm"
+                            (click)="claimYield(ytToken.address)"
+                            [disabled]="isProcessing()">
+                            Claim
+                          </button>
+                        } @else {
+                          <span class="text-muted">-</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="text-center py-4">
+              <i class="bi bi-inbox display-1 text-muted"></i>
+              <p class="text-muted mt-2">No YT tokens found</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions Panel -->
+  <div class="col-lg-4">
+    <!-- Merge PT + YT -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="bi bi-arrow-left-right me-2"></i>
+          Merge PT + YT
+        </h5>
+      </div>
+      <div class="card-body">
+        <form (ngSubmit)="mergePTYT()" #mergeForm="ngForm">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Select SY Token</label>
+            <select 
+              class="form-select" 
+              [(ngModel)]="selectedSYForMerge" 
+              name="selectedSYForMerge"
+              required>
+              <option value="">Choose SY token...</option>
+              @for (syToken of tokenService.syTokens(); track syToken.address) {
+                @if (canMerge(syToken.address)) {
+                  <option [value]="syToken.address">
+                    {{ syToken.name }}
+                  </option>
+                }
+              }
+            </select>
+          </div>
+
+          @if (selectedSYForMerge) {
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Amount to Merge</label>
+              <div class="input-group">
+                <input 
+                  type="number" 
+                  class="form-control" 
+                  [(ngModel)]="mergeAmount" 
+                  name="mergeAmount"
+                  placeholder="0.0"
+                  step="0.001"
+                  min="0"
+                  [max]="getMaxMergeAmount()"
+                  required>
+                <button 
+                  type="button" 
+                  class="btn btn-outline-secondary"
+                  (click)="setMaxMergeAmount()">
+                  MAX
+                </button>
+              </div>
+              <small class="text-muted">
+                Max: {{ getMaxMergeAmount() }}
+              </small>
+            </div>
+
+            <div class="alert alert-info">
+              <small>
+                <strong>You will receive:</strong> {{ mergeAmount || '0' }} SY tokens
+              </small>
+            </div>
+          }
+
+          <button 
+            type="submit" 
+            class="btn btn-primary w-100"
+            [disabled]="!mergeForm.valid || !blockchainService.isConnected() || isProcessing()">
+            @if (isProcessing()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            Merge to SY
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Yield Summary -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="bi bi-graph-up-arrow me-2"></i>
+          Yield Summary
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="text-center mb-3">
+          <h3 class="gradient-text">
+            {{ blockchainService.formatBalance(tokenService.getTotalClaimableYield().toString()) }}
+          </h3>
+          <p class="text-muted mb-0">Total Claimable Yield</p>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button 
+            class="btn btn-warning"
+            (click)="claimAllYield()"
+            [disabled]="tokenService.getTotalClaimableYield() === 0 || isProcessing()">
+            @if (isProcessing()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            Claim All Yield
+          </button>
+        </div>
+
+        <hr>
+
+        <div class="row text-center">
+          <div class="col-6">
+            <h6 class="text-primary">{{ tokenService.ptTokens().length }}</h6>
+            <small class="text-muted">PT Positions</small>
+          </div>
+          <div class="col-6">
+            <h6 class="text-warning">{{ tokenService.ytTokens().length }}</h6>
+            <small class="text-muted">YT Positions</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

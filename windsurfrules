@@ -1,0 +1,148 @@
+# Windsurf Rules for zForge Yield Tokenization Protocol
+
+## Project Overview
+This is zForge, a full-stack yield tokenization protocol inspired by Pendle and Spectra. The project enables users to wrap yield-bearing assets into standardized SY tokens, which can be split into Principal Tokens (PT) and Yield Tokens (YT) for advanced DeFi strategies.
+
+## Architecture
+- **Smart Contracts**: Hardhat + TypeScript (./Contracts/)
+- **Frontend**: Angular 19 with ngBootstrap and purple theme (./frontend/)
+- **Backend**: Express + TypeORM + SQLite (./backend/)
+- **Deployment**: Core blockchain and Core Testnet
+
+## Development Guidelines
+
+### Smart Contracts (./Contracts/)
+- Use Hardhat framework with TypeScript configuration
+- Follow Solidity 0.8.19+ best practices
+- Implement comprehensive test coverage in ./test/
+- Use OpenZeppelin contracts for security standards
+- Deploy scripts should be in ./deploy/
+- Key contracts:
+  - SYToken: ERC-20 wrapper for yield-bearing assets
+  - PTToken: Principal tokens (redeemable 1:1 after maturity)
+  - YTToken: Yield tokens (claim yield until expiry)
+  - SYFactory: Main factory for wrapping/splitting/merging
+  - MockStCORE: Mock staked CORE for testing
+
+### Frontend (./frontend/)
+- Angular 19 with standalone components
+- Use Angular Signals for reactive state management
+- Bootstrap 5.3 with custom purple theme (#6f42c1)
+- Web3 integration with @reown/appKit and ethers v6
+- Components structure:
+  - tokenize: Main tokenization interface
+  - pt-yt: Principal/Yield token management
+  - pools: Trading pools interface
+- Services for blockchain interaction and state management
+- Responsive design with mobile-first approach
+
+### Backend (./backend/)
+- Express.js with TypeScript
+- TypeORM with SQLite database
+- RESTful API endpoints for token tracking
+- Automated cron jobs for maturity checking
+- CORS enabled for frontend integration
+- Environment variables in .env file
+
+## Code Standards
+
+### TypeScript/JavaScript
+- Use strict TypeScript configuration
+- Prefer const/let over var
+- Use async/await over Promises.then()
+- Implement proper error handling with try-catch
+- Use meaningful variable and function names
+- Add JSDoc comments for complex functions
+
+### Solidity
+- Follow Solidity style guide
+- Use NatSpec documentation
+- Implement proper access controls
+- Use events for important state changes
+- Optimize for gas efficiency
+- Include comprehensive unit tests
+
+### Angular
+- Use OnPush change detection strategy
+- Implement proper lifecycle hooks
+- Use Angular Signals for state management
+- Follow Angular style guide
+- Implement proper error handling
+- Use reactive forms for user input
+
+## File Structure Rules
+- Keep contracts in ./Contracts/contracts/
+- Frontend components in ./frontend/src/app/components/
+- Backend routes in ./backend/src/routes/
+- Shared types in respective /types/ directories
+- Tests alongside source files or in dedicated test directories
+
+## Dependencies Management
+- Pin major versions in package.json
+- Use npm for package management
+- Keep dependencies up to date for security
+- Separate dev and production dependencies
+
+## Security Guidelines
+- Never commit private keys or sensitive data
+- Use environment variables for configuration
+- Implement proper input validation
+- Follow smart contract security best practices
+- Use established libraries (OpenZeppelin) for critical functionality
+- Implement proper access controls and permissions
+
+## Testing Requirements
+- Unit tests for all smart contracts
+- Integration tests for contract interactions
+- Frontend component testing with Angular testing utilities
+- Backend API endpoint testing
+- Minimum 80% code coverage for smart contracts
+
+## Deployment Guidelines
+- Use deployment scripts in ./Contracts/deploy/
+- Verify contracts on block explorers
+- Document deployment addresses
+- Use proper network configurations
+- Implement upgrade patterns where necessary
+
+## Git Workflow
+- Use feature branches for development
+- Write descriptive commit messages
+- Include tests with new features
+- Update documentation for API changes
+- Use conventional commit format
+
+## Environment Setup
+- Node.js 18+
+- MetaMask wallet for testing
+- Core blockchain RPC endpoints
+- Proper .env configuration for all modules
+
+## Performance Considerations
+- Optimize smart contract gas usage
+- Implement efficient database queries
+- Use Angular OnPush for performance
+- Minimize bundle size with tree shaking
+- Implement proper caching strategies
+
+## Documentation
+- Keep README.md updated
+- Document API endpoints
+- Include setup instructions
+- Provide usage examples
+- Maintain changelog for releases
+
+## Blockchain Integration
+- Support Core and Core Testnet
+- Handle network switching gracefully
+- Implement proper error handling for failed transactions
+- Use appropriate gas limits and pricing
+- Handle pending transaction states
+
+## UI/UX Guidelines
+- Maintain purple theme consistency (#6f42c1)
+- Ensure responsive design across devices
+- Provide clear user feedback for actions
+- Implement loading states for async operations
+- Use consistent spacing and typography
+- Follow accessibility best practices

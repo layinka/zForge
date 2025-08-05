@@ -1,0 +1,33 @@
+diff --git a/node_modules/@nomicfoundation/hardhat-chai-matchers/internal/addressable.js b/node_modules/@nomicfoundation/hardhat-chai-matchers/internal/addressable.js
+index ad264e1..37bc1a7 100644
+--- a/node_modules/@nomicfoundation/hardhat-chai-matchers/internal/addressable.js
++++ b/node_modules/@nomicfoundation/hardhat-chai-matchers/internal/addressable.js
+@@ -18,10 +18,11 @@ function override(method, name, negativeName, chaiUtils) {
+ function tryGetAddressSync(value) {
+     const { isAddress, isAddressable } = require("ethers");
+     value = (0, typed_1.tryDereference)(value, "address");
+-    if (isAddressable(value)) {
++    // console.log('isAddressable: ', isAddressable, ', isAddress: ', isAddress)
++    if (isAddressable && isAddressable(value)) {
+         value = value.address ?? value.target;
+     }
+-    if (isAddress(value)) {
++    if (isAddress && isAddress(value)) {
+         return value;
+     }
+     else {
+diff --git a/node_modules/@nomicfoundation/hardhat-chai-matchers/src/internal/addressable.ts b/node_modules/@nomicfoundation/hardhat-chai-matchers/src/internal/addressable.ts
+index 71ad0c8..af127db 100644
+--- a/node_modules/@nomicfoundation/hardhat-chai-matchers/src/internal/addressable.ts
++++ b/node_modules/@nomicfoundation/hardhat-chai-matchers/src/internal/addressable.ts
+@@ -31,7 +31,9 @@ function tryGetAddressSync(value: any): string | undefined {
+   const { isAddress, isAddressable } = require("ethers") as typeof EthersT;
+ 
+   value = tryDereference(value, "address");
+-  if (isAddressable(value)) {
++  
++  console.log('isAddressable: ', isAddressable)
++  if (isAddressable && isAddressable(value)) {
+     value = (value as any).address ?? (value as any).target;
+   }
+   if (isAddress(value)) {

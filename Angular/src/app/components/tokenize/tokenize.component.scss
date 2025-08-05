@@ -1,0 +1,36 @@
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary-purple), var(--secondary-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.balance-card {
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  transition: all 0.3s ease;
+}
+
+.balance-card:hover {
+  border-color: var(--primary-purple);
+  transform: translateY(-2px);
+}
+
+.token-badge {
+  background: linear-gradient(135deg, var(--light-purple), var(--secondary-purple));
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.table th {
+  border-top: none;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

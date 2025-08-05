@@ -1,0 +1,58 @@
+<div class="modal-header border-0 pb-0">
+  <div>
+    <h5 class="modal-title">Select a token</h5>
+    @if (filterByNetwork) {
+      <small class="text-muted">Showing {{ filterByNetwork }} tokens only</small>
+    }
+  </div>
+  <button type="button" class="btn-close" (click)="activeModal.dismiss()" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+  <!-- Search Input -->
+  <div class="input-group mb-4">
+    <span class="input-group-text bg-transparent border-end-0">
+      <i class="bi bi-search text-muted"></i>
+    </span>
+    <input 
+      type="text" 
+      class="form-control border-start-0" 
+      placeholder="Search token name or paste address"
+      [(ngModel)]="searchTerm"
+      (input)="filterTokens()"
+      autofocus
+    >
+  </div>
+
+  <!-- Token List -->
+  <div class="token-list">
+    @for (token of filteredTokens; track token.address + token.chain) {
+      <div 
+        class="token-item d-flex align-items-center p-3 rounded-3 mb-2"
+        [class.bg-light]="isCurrentToken(token)"
+        (click)="selectToken(token)"
+      >
+        <img 
+          [src]="token.icon" 
+          [alt]="token.name" 
+          class="token-icon me-3"
+          width="32"
+          height="32"
+        >
+        <div class="me-auto">
+          <div class="fw-medium">{{ token.symbol }}</div>
+          <div class="small text-muted">{{ token.name }}</div>
+        </div>
+        <div class="text-end">
+          <div class="fw-medium">0.00</div>
+          <div class="small text-muted">{{ token.chain }}</div>
+        </div>
+      </div>
+    } @empty {
+      <div class="text-center py-5">
+        <i class="bi bi-emoji-frown fs-1 text-muted mb-3 d-block"></i>
+        <p class="text-muted">No tokens found</p>
+      </div>
+    }
+  </div>
+</div>

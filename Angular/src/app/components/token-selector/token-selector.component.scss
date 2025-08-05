@@ -1,0 +1,120 @@
+/* Token Selector Styling */
+:host {
+  display: block;
+}
+
+.modal-content {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 1.5rem 1.5rem 0.5rem;
+  
+  .modal-title {
+    font-weight: 600;
+  }
+}
+
+.modal-body {
+  padding: 0 1.5rem 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: var(--bs-light);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: var(--bs-gray-400);
+    border-radius: 3px;
+  }
+}
+
+.input-group {
+  background-color: var(--bs-gray-100);
+  border-radius: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  transition: all 0.2s ease;
+  
+  &:focus-within {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.1);
+  }
+  
+  .input-group-text {
+    border: none;
+    background: transparent;
+    padding: 0.75rem 1rem;
+  }
+  
+  .form-control {
+    border: none;
+    background: transparent;
+    padding: 0.75rem 0;
+    
+    &:focus {
+      box-shadow: none;
+    }
+  }
+}
+
+.token-list {
+  margin: 0 -0.5rem;
+}
+
+.token-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  
+  &:hover {
+    background-color: var(--bs-gray-100) !important;
+    border-color: var(--bs-border-color);
+  }
+  
+  .token-icon {
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+  }
+  
+  .token-symbol {
+    font-weight: 500;
+  }
+  
+  .token-name {
+    color: var(--bs-gray-600);
+    font-size: 0.85rem;
+  }
+  
+  .token-balance {
+    text-align: right;
+  }
+  
+  .token-chain {
+    font-size: 0.75rem;
+    color: var(--bs-gray-600);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  
+  .modal-body {
+    padding: 0 1rem 1rem;
+  }
+  
+  .token-item {
+    padding: 0.75rem !important;
+  }
+}

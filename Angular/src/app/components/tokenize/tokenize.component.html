@@ -1,0 +1,259 @@
+<div class="row">
+  <div class="col-12">
+    <div class="text-center mb-5">
+      <h1 class="gradient-text display-4 fw-bold">Tokenize Your Yield</h1>
+      <p class="lead text-muted">
+        Wrap your yield-bearing assets and split them into tradable Principal and Yield tokens
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Wrap Section -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h4 class="mb-0">
+          <i class="bi bi-box-arrow-in-right me-2"></i>
+          Wrap Assets
+        </h4>
+      </div>
+      <div class="card-body">
+        <form (ngSubmit)="wrapAsset()" #wrapForm="ngForm">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Select Asset</label>
+            <select 
+              class="form-select" 
+              [(ngModel)]="selectedToken" 
+              name="selectedToken"
+              required>
+              <option value="">Choose an asset...</option>
+              @for (token of tokenService.availableTokens(); track token.address) {
+                <option [value]="token.address">
+                  {{ token.name }} ({{ token.symbol }})
+                  @if (token.apy) {
+                    - {{ tokenService.formatAPY(token.apy) }} APY
+                  }
+                </option>
+              }
+            </select>
+          </div>
+
+          @if (selectedToken) {
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label fw-semibold">Amount</label>
+                <small class="text-muted">
+                  Balance: {{ getTokenBalance(selectedToken) }}
+                </small>
+              </div>
+              <div class="input-group">
+                <input 
+                  type="number" 
+                  class="form-control" 
+                  [(ngModel)]="wrapAmount" 
+                  name="wrapAmount"
+                  placeholder="0.0"
+                  step="0.001"
+                  min="0"
+                  required>
+                <button 
+                  type="button" 
+                  class="btn btn-outline-secondary"
+                  (click)="setMaxAmount()">
+                  MAX
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="alert alert-info">
+                <small>
+                  <strong>You will receive:</strong> {{ wrapAmount || '0' }} SY tokens<br>
+                  <strong>Maturity:</strong> 6 months from now<br>
+                  <strong>Estimated APY:</strong> {{ getSelectedTokenAPY() }}
+                </small>
+              </div>
+            </div>
+          }
+
+          <button 
+            type="submit" 
+            class="btn btn-primary w-100"
+            [disabled]="!wrapForm.valid || !blockchainService.isConnected() || isProcessing()"
+            [class.disabled]="isProcessing()">
+            @if (isProcessing()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            {{ needsApproval() ? 'Approve & Wrap' : 'Wrap Asset' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split Section -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h4 class="mb-0">
+          <i class="bi bi-scissors me-2"></i>
+          Split SY Tokens
+        </h4>
+      </div>
+      <div class="card-body">
+        <form (ngSubmit)="splitSYToken()" #splitForm="ngForm">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Select SY Token</label>
+            <select 
+              class="form-select" 
+              [(ngModel)]="selectedSYToken" 
+              name="selectedSYToken"
+              required>
+              <option value="">Choose SY token...</option>
+              @for (syToken of tokenService.syTokens(); track syToken.address) {
+                <option [value]="syToken.address">
+                  {{ syToken.name }} - {{ tokenService.formatMaturity(syToken.maturity) }}
+                </option>
+              }
+            </select>
+          </div>
+
+          @if (selectedSYToken) {
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label fw-semibold">Amount to Split</label>
+                <small class="text-muted">
+                  Balance: {{ getSYTokenBalance(selectedSYToken) }}
+                </small>
+              </div>
+              <div class="input-group">
+                <input 
+                  type="number" 
+                  class="form-control" 
+                  [(ngModel)]="splitAmount" 
+                  name="splitAmount"
+                  placeholder="0.0"
+                  step="0.001"
+                  min="0"
+                  required>
+                <button 
+                  type="button" 
+                  class="btn btn-outline-secondary"
+                  (click)="setMaxSYAmount()">
+                  MAX
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="alert alert-success">
+                <small>
+                  <strong>You will receive:</strong><br>
+                  • {{ splitAmount || '0' }} PT tokens (Principal)<br>
+                  • {{ splitAmount || '0' }} YT tokens (Yield)<br>
+                  <strong>Maturity:</strong> {{ getSelectedSYMaturity() }}
+                </small>
+              </div>
+            </div>
+          }
+
+          <button 
+            type="submit" 
+            class="btn btn-primary w-100"
+            [disabled]="!splitForm.valid || !blockchainService.isConnected() || isProcessing()"
+            [class.disabled]="isProcessing()">
+            @if (isProcessing()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            Split into PT + YT
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Portfolio Overview -->
+<div class="row mt-5">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="mb-0">
+          <i class="bi bi-wallet2 me-2"></i>
+          Portfolio Overview
+        </h4>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="balance-card card text-center p-3">
+              <h6 class="text-muted mb-1">Total Value</h6>
+              <h4 class="gradient-text mb-0">
+                ${{ (tokenService.getTotalPortfolioValue() * 1500).toFixed(2) }}
+              </h4>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="balance-card card text-center p-3">
+              <h6 class="text-muted mb-1">SY Tokens</h6>
+              <h4 class="text-primary mb-0">{{ tokenService.syTokens().length }}</h4>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="balance-card card text-center p-3">
+              <h6 class="text-muted mb-1">PT Tokens</h6>
+              <h4 class="text-success mb-0">{{ tokenService.ptTokens().length }}</h4>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="balance-card card text-center p-3">
+              <h6 class="text-muted mb-1">YT Tokens</h6>
+              <h4 class="text-warning mb-0">{{ tokenService.ytTokens().length }}</h4>
+            </div>
+          </div>
+        </div>
+
+        @if (tokenService.syTokens().length > 0) {
+          <div class="mt-4">
+            <h6 class="fw-semibold mb-3">Your SY Tokens</h6>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Token</th>
+                    <th>Balance</th>
+                    <th>Maturity</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (syToken of tokenService.syTokens(); track syToken.address) {
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center">
+                          <span class="token-badge me-2">{{ syToken.symbol }}</span>
+                          {{ syToken.name }}
+                        </div>
+                      </td>
+                      <td>{{ blockchainService.formatBalance(syToken.balance) }}</td>
+                      <td>{{ tokenService.formatMaturity(syToken.maturity) }}</td>
+                      <td>
+                        @if (syToken.hasMatured) {
+                          <span class="badge bg-danger">Matured</span>
+                        } @else {
+                          <span class="badge bg-success">Active</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>
