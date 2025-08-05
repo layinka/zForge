@@ -1,17 +1,17 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 import { watchAccount,getEnsAddress,  getEnsName, fetchBlockNumber,  createConfig, injected, getChainId,
    watchChainId, getBalance, getBlockNumber, getPublicClient, getWalletClient, 
-   reconnect } from '@wagmi/core';
+   reconnect} from '@wagmi/core';
 
-import {AppKitNetwork, mainnet} from '@reown/appkit/networks';   
+import {AppKitNetwork, hardhat, mainnet} from '@reown/appkit/networks';   
 
 import { getAccount, readContract,  fetchToken } from '@wagmi/core';
 
 import { environment } from '../../environments/environment';
 import { BehaviorSubject } from 'rxjs';
 // import ROUTER_ABI from '../../assets/abis/router.json';
-import { createPublicClient, erc20Abi, FallbackTransport, getContract, http } from 'viem';
+import { Address, createPublicClient, erc20Abi, FallbackTransport, getContract, http } from 'viem';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { AppKit, createAppKit } from '@reown/appkit';
 import { coreDao,coreTestnet2 } from '@wagmi/core/chains';
@@ -20,7 +20,7 @@ import { coreDao,coreTestnet2 } from '@wagmi/core/chains';
 // const queryClient = new QueryClient()
 
 
-export const ALL_CHAINS: AppKitNetwork[] = [  coreDao,coreTestnet2 ];
+export const ALL_CHAINS: AppKitNetwork[] = [ hardhat, coreDao,coreTestnet2 ];
 
 const projectId = environment.walletConnectProjectId;
 
@@ -31,14 +31,15 @@ const metadata = {
   icons: ['https://avatars.githubusercontent.com/u/37784886']
 }
 
- const supportedChains:[AppKitNetwork, ...AppKitNetwork[]] = (environment.production===true? [coreDao, coreTestnet2]: [coreDao, coreTestnet2])
+ const supportedChains:[AppKitNetwork, ...AppKitNetwork[]] = (environment.production===true? [coreDao, coreTestnet2, hardhat]: [coreDao, coreTestnet2, hardhat])
  
 export const wagmiAdapter = new WagmiAdapter({
   networks: supportedChains,
   projectId,
   transports:{
     [coreDao.id]: http(),
-    [coreTestnet2.id]: http()
+    [coreTestnet2.id]: http(),
+    [hardhat.id]: http()
 
   }
   
@@ -50,7 +51,8 @@ export const wagmiConfig = wagmiAdapter.wagmiConfig
 export const chains: Record<number, AppKitNetwork> = {
   
   1116: coreDao,
-  1114: coreTestnet2
+  1114: coreTestnet2,
+  31337: hardhat
 } 
 
 export const useNativeChainCoinList = [
@@ -68,24 +70,21 @@ export class Web3Service {
   projectId = environment.walletConnectProjectId;
   
 
-  private _chainId$ = new BehaviorSubject<number|undefined>(undefined);
+  // Chain ID signal
+  public chainId$ = signal<number | undefined>(undefined);
   
-  public chainId$ = this._chainId$.asObservable()
-
-  public get chainId(){
-    
-    return this._chainId$.value;
+  public get chainId(): number | undefined {
+    return this.chainId$();
   }
+  
 
   unwatchNetwork : any;
 
-  private _account$ = new BehaviorSubject<string|undefined>(undefined);
-  
-  public account$ = this._account$.asObservable()
+  public account$ = signal<Address | undefined>(undefined);
 
   public get account(){
     
-    return this._account$.value;
+    return this.account$();
   }
 
   unwatchAccount : any;
@@ -119,17 +118,29 @@ export class Web3Service {
 
     reconnect(wagmiAdapter.wagmiConfig);
 
+    // setTimeout(() => {
+    //   const chainId = getChainId(wagmiAdapter.wagmiConfig);
+    //   if(chainId){
+    //     console.log("W 1 ChainId: ", chainId);
+    //     this.chainId$.set(chainId);
+    //   }
+    // }, 300);
+
+    
+
     //Update chainId on change
     this.unwatchNetwork = watchChainId(wagmiAdapter.wagmiConfig,      
       {
         onChange:  async (chainId) => {
+
+          console.log("ChainId changed to: ", chainId);
           
           if(chainId ){
             
-            this._chainId$.next(chainId );
+            this.chainId$.set(chainId );
 
           }else{
-            this._chainId$.next(undefined);
+            this.chainId$.set(undefined);
           }
         },
       }
@@ -139,9 +150,9 @@ export class Web3Service {
       onChange: (account) => {
         
         if(account && account.isConnected){
-          this._account$.next(account.address);
+          this.account$.set(account.address);
         }else{
-          this._account$.next(undefined);
+          this.account$.set(undefined);
         }
         
       }
@@ -154,11 +165,9 @@ export class Web3Service {
     return getAccount(wagmiConfig);
   }
 
-  async getBalanceNativeCurrency(account: `0x${string}`) {
+  async getBalanceNativeCurrency(account: Address) {
     return await getBalance(wagmiConfig,{
-      address: account,
-
-      
+      address: account,      
     });
   }
 

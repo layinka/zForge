@@ -10,7 +10,7 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
   console.log("Deploying contracts with account:", deployer);
 
   // Deploy MockStCORE first
-  const mockStCORE = await deploy("MockStCORE", {
+  const mockStCORE = await deploy("MockStCoreBlockEarner", {
     from: deployer,
     args: [],
     log: true,

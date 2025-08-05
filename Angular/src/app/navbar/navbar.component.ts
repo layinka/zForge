@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, effect } from '@angular/core';
 import { combineLatest, Subscription } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { NgbCollapse } from '@ng-bootstrap/ng-bootstrap';
@@ -35,15 +35,12 @@ export class NavbarComponent {
   }
 
   ngOnInit(){
-    setTimeout(()=>{
-      
+    effect(()=>{
+      if(this.w3s.chainId$()) {
+        this.chainName =ALL_CHAINS[this.w3s.chainId$()??31337]?.name
+      }
+    })
 
-      this.chainSubscription= this.w3s.chainId$.subscribe(async ( chainId)=>{
-        setTimeout(()=>{
-          this.chainName =ALL_CHAINS[chainId??31337]?.name
-        }, 300)
-      })
-
-    }, 300)
   }
+  
 }

@@ -29,7 +29,7 @@
               name="selectedToken"
               required>
               <option value="">Choose an asset...</option>
-              @for (token of tokenService.availableTokens(); track token.address) {
+              @for (token of tokenService.getAvailableTokens(); track token.address) {
                 <option [value]="token.address">
                   {{ token.name }} ({{ token.symbol }})
                   @if (token.apy) {

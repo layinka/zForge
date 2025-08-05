@@ -1,7 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { computed, effect, Injectable, signal } from '@angular/core';
 import { readContract, writeContract, multicall } from '@wagmi/core';
 import { formatEther, parseEther, formatUnits } from 'viem';
-import { environment } from '../../environments/environment';
+import { environment, getCurrentChainContracts, ChainContracts } from '../../environments/environment';
 import { Web3Service, wagmiAdapter } from './web3';
 
 // Contract ABIs (proper ABI format for wagmi)
@@ -228,20 +228,10 @@ export interface SYTokenInfo extends TokenInfo {
 })
 export class BlockchainService {
   // Signals for reactive UI (derived from Web3Service)
-  public isConnected = signal(false);
-  public address = signal<string | undefined>(undefined);
-  public chainId = signal<number | undefined>(undefined);
+  public isConnected = computed(() => !!this.web3Service.account);
 
   constructor(private web3Service: Web3Service) {
-    // Subscribe to Web3Service state and update signals
-    this.web3Service.account$.subscribe(account => {
-      this.address.set(account);
-      this.isConnected.set(!!account);
-    });
     
-    this.web3Service.chainId$.subscribe(chainId => {
-      this.chainId.set(chainId);
-    });
   }
 
   // Convenience getters
@@ -253,8 +243,9 @@ export class BlockchainService {
     return this.web3Service.chainId;
   }
 
-  get isWalletConnected(): boolean {
-    return !!this.web3Service.account;
+  // Get contracts for current chain
+  getCurrentChainContracts(): ChainContracts {
+    return getCurrentChainContracts(this.web3Service.chainId);
   }
 
   // Contract interaction methods
@@ -349,7 +340,7 @@ export class BlockchainService {
           args: [address as `0x${string}`]
         },
         {
-          address: environment.contracts.syFactory as `0x${string}`,
+          address: this.getCurrentChainContracts().syFactory as `0x${string}`,
           abi: SY_FACTORY_ABI,
           functionName: 'getTokenPair',
           args: [syTokenAddress as `0x${string}`]
@@ -401,6 +392,7 @@ export class BlockchainService {
   }
 
   async approveToken(tokenAddress: string, spenderAddress: string, amount: string): Promise<void> {
+   console.log(tokenAddress, spenderAddress, amount);
     await writeContract(wagmiAdapter.wagmiConfig, {
       address: tokenAddress as `0x${string}`,
       abi: ERC20_ABI,
@@ -409,9 +401,9 @@ export class BlockchainService {
     });
   }
 
-  async wrapToken(underlyingAddress: string, amount: string): Promise<void> {
+  async wrapToken(underlyingAddress: string, amount: string) {
     await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'wrap',
       args: [underlyingAddress as `0x${string}`, parseEther(amount)]
@@ -420,7 +412,7 @@ export class BlockchainService {
 
   async splitSYToken(syTokenAddress: string, amount: string): Promise<void> {
     await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'split',
       args: [syTokenAddress as `0x${string}`, parseEther(amount)]
@@ -429,7 +421,7 @@ export class BlockchainService {
 
   async mergePTYT(syTokenAddress: string, amount: string): Promise<void> {
     await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'merge',
       args: [syTokenAddress as `0x${string}`, parseEther(amount)]
@@ -438,7 +430,7 @@ export class BlockchainService {
 
   async redeemPT(ptTokenAddress: string): Promise<void> {
     await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'redeemPT',
       args: [ptTokenAddress as `0x${string}`]
@@ -447,7 +439,7 @@ export class BlockchainService {
 
   async claimYT(ytTokenAddress: string): Promise<void> {
     await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'claimYT',
       args: [ytTokenAddress as `0x${string}`]
@@ -456,7 +448,7 @@ export class BlockchainService {
 
   async getAllSYTokens(): Promise<string[]> {
     return await readContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'getAllSYTokens',
       args: []
@@ -475,10 +467,8 @@ export class BlockchainService {
   }
 
   formatBalance(balance: string, decimals: number = 18): string {
-    const num = parseFloat(balance);
-    if (num === 0) return '0';
-    if (num < 0.001) return '< 0.001';
-    return num.toFixed(3);
+   //dont chnge for now
+    return balance;
   }
 }
 

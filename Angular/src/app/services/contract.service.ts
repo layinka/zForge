@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { writeContract, readContract } from '@wagmi/core';
 import { parseEther, formatEther } from 'viem';
-import { environment } from '../../environments/environment';
-import { wagmiAdapter } from './web3';
+import { environment, getCurrentChainContracts, ChainContracts } from '../../environments/environment';
+import { wagmiAdapter, Web3Service } from './web3';
 
 // Contract ABIs
 const SY_FACTORY_ABI = [
@@ -121,12 +121,17 @@ const ERC20_ABI = [
 
 @Injectable({ providedIn: 'root' })
 export class ContractService {
-  constructor() {}
+  constructor(private web3Service: Web3Service) {}
+
+  // Get contracts for current chain
+  private getCurrentChainContracts(): ChainContracts {
+    return getCurrentChainContracts(this.web3Service.chainId);
+  }
 
   // SY Factory contract interactions
   async wrapToken(underlying: string, amount: string) {
     return await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'wrap',
       args: [underlying as `0x${string}`, parseEther(amount)]
@@ -135,7 +140,7 @@ export class ContractService {
 
   async splitSYToken(syTokenAddress: string, amount: string) {
     return await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'split',
       args: [syTokenAddress as `0x${string}`, parseEther(amount)]
@@ -144,7 +149,7 @@ export class ContractService {
 
   async mergePTYT(syTokenAddress: string, amount: string) {
     return await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'merge',
       args: [syTokenAddress as `0x${string}`, parseEther(amount)]
@@ -153,7 +158,7 @@ export class ContractService {
 
   async redeemPT(ptTokenAddress: string) {
     return await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'redeemPT',
       args: [ptTokenAddress as `0x${string}`]
@@ -162,7 +167,7 @@ export class ContractService {
 
   async claimYT(ytTokenAddress: string) {
     return await writeContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'claimYT',
       args: [ytTokenAddress as `0x${string}`]
@@ -204,7 +209,7 @@ export class ContractService {
   // Read-only contract calls
   async getSYToken(underlyingAddress: string): Promise<string> {
     return await readContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'getSYToken',
       args: [underlyingAddress as `0x${string}`]
@@ -213,7 +218,7 @@ export class ContractService {
 
   async getTokenPair(syTokenAddress: string): Promise<[string, string]> {
     const result = await readContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'getTokenPair',
       args: [syTokenAddress as `0x${string}`]
@@ -224,7 +229,7 @@ export class ContractService {
 
   async getAllSYTokens(): Promise<string[]> {
     return await readContract(wagmiAdapter.wagmiConfig, {
-      address: environment.contracts.syFactory as `0x${string}`,
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'getAllSYTokens',
       args: []

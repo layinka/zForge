@@ -32,15 +32,26 @@
   transition: all 0.3s ease;
 }
 
+.navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(130, 94, 245, 1)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+
 .navbar-custom {
   padding: 0.75rem 0;
-  
+  color: #825ef5;
   .navbar-brand {
     &.brand-logo {
+      color: #825ef5;
       text-decoration: none;
       transition: all 0.3s ease;
       
       .brand-text {
+        color: #825ef5;
         font-size: 1.75rem;
         font-weight: 700;
         background: var(--purple-gradient);
@@ -56,6 +67,7 @@
     }
   }
   
+  
   // Mobile toggle button
   .custom-toggler {
     border: none;
@@ -68,13 +80,16 @@
     gap: 3px;
     transition: all 0.3s ease;
     
-    .toggler-icon {
+    .navbar-toggler-icon {
       width: 20px;
       height: 2px;
       background: var(--primary-purple);
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 0, 0, 1)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
       border-radius: 2px;
       transition: all 0.3s ease;
+      color: #825ef5;
     }
+
     
     &:hover {
       .toggler-icon {

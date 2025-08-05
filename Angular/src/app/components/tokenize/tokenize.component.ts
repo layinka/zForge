@@ -43,7 +43,7 @@ export class TokenizeComponent implements OnInit {
       if (this.needsApproval()) {
         await this.blockchainService.approveToken(
           this.selectedToken,
-          '0x...', // SY Factory address
+          this.blockchainService.getCurrentChainContracts().syFactory, // SY Factory address
           this.wrapAmount
         );
       }
@@ -96,8 +96,9 @@ export class TokenizeComponent implements OnInit {
   }
 
   getTokenBalance(tokenAddress: string): string {
-    const token = this.tokenService.userTokens().find(t => t.address === tokenAddress);
-    return token ? this.blockchainService.formatBalance(token.balance) : '0';
+    const chainData = this.tokenService.getChainDataReadonly(this.blockchainService.currentChainId ?? 1114);
+    const tokenBalance = chainData?.tokenBalances[tokenAddress];
+    return tokenBalance ? this.blockchainService.formatBalance(tokenBalance) : '0';
   }
 
   getSYTokenBalance(syTokenAddress: string): string {
