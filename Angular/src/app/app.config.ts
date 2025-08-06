@@ -7,7 +7,6 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { FormsModule } from '@angular/forms';
 
 import { routes } from './app.routes';
-import { WalletService } from './services/wallet.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -23,6 +22,5 @@ export const appConfig: ApplicationConfig = {
     }),
     importProvidersFrom(FormsModule),
     NgbModal,
-    WalletService,
   ]
 };

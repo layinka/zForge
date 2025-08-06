@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { writeContract, readContract } from '@wagmi/core';
 import { parseEther, formatEther } from 'viem';
-import { environment, getCurrentChainContracts, ChainContracts } from '../../environments/environment';
+import { environment, ChainContracts } from '../../environments/environment';
 import { wagmiAdapter, Web3Service } from './web3';
 
 // Contract ABIs
@@ -125,7 +125,8 @@ export class ContractService {
 
   // Get contracts for current chain
   private getCurrentChainContracts(): ChainContracts {
-    return getCurrentChainContracts(this.web3Service.chainId);
+    const chainId = this.web3Service.chainId || 31337;
+    return environment.contracts[chainId] || environment.contracts[31337];
   }
 
   // SY Factory contract interactions

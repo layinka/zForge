@@ -1,7 +1,7 @@
 import { computed, effect, Injectable, signal } from '@angular/core';
 import { readContract, writeContract, multicall } from '@wagmi/core';
 import { formatEther, parseEther, formatUnits } from 'viem';
-import { environment, getCurrentChainContracts, ChainContracts } from '../../environments/environment';
+import { environment, ChainContracts } from '../../environments/environment';
 import { Web3Service, wagmiAdapter } from './web3';
 
 // Contract ABIs (proper ABI format for wagmi)
@@ -243,9 +243,14 @@ export class BlockchainService {
     return this.web3Service.chainId;
   }
 
+  get isWalletConnected(): boolean {
+    return !!this.web3Service.account;
+  }
+
   // Get contracts for current chain
   getCurrentChainContracts(): ChainContracts {
-    return getCurrentChainContracts(this.web3Service.chainId);
+    const chainId = this.web3Service.chainId || 31337;
+    return environment.contracts[chainId] || environment.contracts[31337];
   }
 
   // Contract interaction methods

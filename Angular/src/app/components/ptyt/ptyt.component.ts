@@ -124,7 +124,7 @@ export class PtytComponent implements OnInit {
     const ptToken = this.tokenService.ptTokens().find(t => t.address === syToken.ptAddress);
     const ytToken = this.tokenService.ytTokens().find(t => t.address === syToken.ytAddress);
     
-    return (ptToken && ytToken && parseFloat(ptToken.balance) > 0 && parseFloat(ytToken.balance) > 0)|| false;
+    return (ptToken && ytToken && parseFloat(ptToken.balance) > 0 && parseFloat(ytToken.balance) > 0) || false;
   }
 
   getPTMaturity(ptTokenAddress: string): string {

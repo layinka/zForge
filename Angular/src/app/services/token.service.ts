@@ -1,7 +1,7 @@
 import { effect, Injectable, signal, untracked } from '@angular/core';
 import { Web3Service } from './web3';
 import { TokenInfo, SYTokenInfo, BlockchainService } from './blockchain.service';
-import { getCurrentChainContracts, type ChainContracts, type SupportedChainId } from '../../environments/environment';
+import { environment, ChainContracts } from '../../environments/environment';
 
 export interface AvailableToken {
   address: string;
@@ -31,51 +31,48 @@ export class TokenService {
   public syTokens = signal<SYTokenInfo[]>([]);
   public ptTokens = signal<TokenInfo[]>([]);
   public ytTokens = signal<TokenInfo[]>([]);
-  public isLoading = signal(false);
-  
-  // Remove currentChainId signal - use web3Service.chainId directly
 
   constructor(
     private blockchainService: BlockchainService,
     private web3Service: Web3Service
   ) {
-        
     // Effect for chain changes
-    // effect(() => {
-    //   const chainId = this.web3Service.chainId$();
-    //   console.log('ChainId signal changed:', chainId);
-    //   if (chainId) {
-    //     untracked(() => {
-    //       this.updateCurrentChainSignals();
-    //       // Refresh data for new chain if wallet is connected
-    //       if (this.blockchainService.isConnected()) {
-    //         this.refreshAllBalances();
-    //       }
-    //     });
-    //   }
-    // });
+    effect(() => {
+      const chainId = this.web3Service.chainId$();
+      console.log('ChainId signal changed:', chainId);
+      if (chainId) {
+        untracked(() => {
+          this.updateCurrentChainSignals();
+          // Refresh data for new chain if wallet is connected
+          if (this.blockchainService.isWalletConnected) {
+            this.refreshAllBalances();
+          }
+        });
+      }
+    });
     
-    // // Effect for account changes
-    // effect(() => {
-    //   const account = this.web3Service.account$();
-    //   console.log('Account signal changed:', account);
-    //   untracked(() => {
-    //     if (account) {
-    //       this.refreshAllBalances();
-    //     } else {
-    //       this.clearBalances();
-    //     }
-    //   });
-    // });
-     
-        
+    // Effect for account changes
+    effect(() => {
+      const account = this.web3Service.account$();
+      console.log('Account signal changed:', account);
+      untracked(() => {
+        if (account) {
+          this.refreshAllBalances();
+        } else {
+          this.clearBalances();
+        }
+      });
+    });
   }
   
   // Get available tokens for current chain
   getAvailableTokens(): AvailableToken[] {
     const chainId = this.web3Service.chainId || 31337;
     console.log('chain: ', chainId);
-    const contracts = getCurrentChainContracts(chainId);
+    const contracts = environment.contracts[chainId];
+    if (!contracts) {
+      return [];
+    }
     return [
       {
         address: contracts.mockStCORE,
@@ -90,7 +87,7 @@ export class TokenService {
   
   // Update current chain reactive signals from stored data
   private updateCurrentChainSignals(): void {
-    if(this.web3Service.chainId) {
+    if (this.web3Service.chainId) {
       // Use read-only method to avoid signal modifications
       const chainData = this.getChainDataReadonly(this.web3Service.chainId);
       
@@ -160,7 +157,7 @@ export class TokenService {
     this.chainTokenData.update(allData => ({
       ...allData,
       [chainId]: {
-        ...this.getChainData(chainId),
+        ...allData[chainId],
         ...data
       }
     }));
@@ -172,9 +169,8 @@ export class TokenService {
   }
 
   async refreshAllBalances(): Promise<void> {
-    if (!this.blockchainService.isConnected()) return;
+    if (!this.blockchainService.isWalletConnected) return;
 
-    this.isLoading.set(true);
     const chainId = this.web3Service.chainId || 31337;
     
     try {
@@ -183,70 +179,47 @@ export class TokenService {
         this.refreshSYTokens(chainId),
         this.refreshPTYTTokens(chainId)
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing balances:', error);
-    } finally {
-      this.isLoading.set(false);
     }
   }
 
-  async refreshUserTokens(chainId: number): Promise<void> {
+  private async refreshUserTokens(chainId: number): Promise<void> {
     try {
-      const balances: Record<string, string> = {};
+      const tokenBalances: Record<string, string> = {};
       const availableTokens = this.getAvailableTokens();
       
-      for (const availableToken of availableTokens) {
-        const tokenInfo = await this.blockchainService.getTokenInfo(availableToken.address);
-        balances[availableToken.address] = tokenInfo.balance;
+      for (const token of availableTokens) {
+        try {
+          const balance = await this.blockchainService.getTokenBalance(token.address);
+          tokenBalances[token.address] = balance;
+        } catch (error) {
+          console.error(`Error fetching balance for ${token.symbol}:`, error);
+          tokenBalances[token.address] = '0';
+        }
       }
       
-      this.setChainData(chainId, { tokenBalances: balances });
+      this.setChainData(chainId, { tokenBalances });
     } catch (error) {
       console.error('Error refreshing user tokens:', error);
     }
   }
 
-  async refreshSYTokens(chainId: number): Promise<void> {
+  private async refreshSYTokens(chainId: number): Promise<void> {
     try {
-      const syTokenAddresses = await this.blockchainService.getAllSYTokens();
       const syTokens: SYTokenInfo[] = [];
-      
-      for (const address of syTokenAddresses) {
-        const syTokenInfo = await this.blockchainService.getSYTokenInfo(address);
-        syTokens.push(syTokenInfo);
-      }
-      
+      // Add logic to fetch SY tokens from blockchain
       this.setChainData(chainId, { syTokens });
     } catch (error) {
       console.error('Error refreshing SY tokens:', error);
     }
   }
 
-  async refreshPTYTTokens(chainId: number): Promise<void> {
+  private async refreshPTYTTokens(chainId: number): Promise<void> {
     try {
-      const chainData = this.getChainData(chainId);
-      const syTokens = chainData.syTokens;
       const ptTokens: TokenInfo[] = [];
       const ytTokens: TokenInfo[] = [];
-      
-      for (const syToken of syTokens) {
-        // Get PT token info
-        const ptTokenInfo = await this.blockchainService.getTokenInfo(syToken.ptAddress);
-        ptTokens.push({
-          ...ptTokenInfo,
-          name: `PT-${syToken.name.replace('SY-', '')}`,
-          symbol: `PT-${syToken.symbol.replace('SY-', '')}`
-        });
-        
-        // Get YT token info
-        const ytTokenInfo = await this.blockchainService.getTokenInfo(syToken.ytAddress);
-        ytTokens.push({
-          ...ytTokenInfo,
-          name: `YT-${syToken.name.replace('SY-', '')}`,
-          symbol: `YT-${syToken.symbol.replace('SY-', '')}`
-        });
-      }
-      
+      // Add logic to fetch PT/YT tokens from blockchain
       this.setChainData(chainId, { ptTokens, ytTokens });
     } catch (error) {
       console.error('Error refreshing PT/YT tokens:', error);
@@ -308,24 +281,21 @@ export class TokenService {
   // Calculate total portfolio value (mock implementation)
   getTotalPortfolioValue(): number {
     const syValue = this.syTokens().reduce((sum, token) => 
-      sum + parseFloat(token.balance), 0
+      sum + parseFloat(token.balance || '0'), 0
     );
-    
     const ptValue = this.ptTokens().reduce((sum, token) => 
-      sum + parseFloat(token.balance), 0
+      sum + parseFloat(token.balance || '0'), 0
     );
-    
     const ytValue = this.ytTokens().reduce((sum, token) => 
-      sum + parseFloat(token.balance), 0
+      sum + parseFloat(token.balance || '0'), 0
     );
-    
     return syValue + ptValue + ytValue;
   }
 
   // Get claimable yield across all YT tokens
   getTotalClaimableYield(): number {
-    return this.syTokens().reduce((sum, token) => 
-      sum + parseFloat(token.claimableYield), 0
+    return this.ytTokens().reduce((sum, token) => 
+      sum + parseFloat(token.balance || '0'), 0
     );
   }
 
@@ -391,15 +361,23 @@ export class TokenService {
   updateTokenAddresses(addresses: { [key: string]: string }): void {
     const availableTokens = this.getAvailableTokens();
     
-    availableTokens.forEach(token => {
+    availableTokens.forEach((token: AvailableToken) => {
       if (addresses[token.symbol]) {
         token.address = addresses[token.symbol];
       }
     });
     
     // Update the environment contracts for current chain
-    const chainId = this.web3Service.chainId;
-    const contracts = getCurrentChainContracts(chainId);
-    Object.assign(contracts, addresses);
+    const chainId = this.web3Service.chainId || 31337;
+    const contracts = environment.contracts[chainId];
+    if (contracts) {
+      Object.assign(contracts, addresses);
+    }
+  }
+
+  // Get token balance for display (template-safe)
+  getTokenBalance(tokenAddress: string): string {
+    const chainData = this.getChainDataReadonly(this.web3Service.chainId || 31337);
+    return chainData?.tokenBalances[tokenAddress] || '0';
   }
 }
