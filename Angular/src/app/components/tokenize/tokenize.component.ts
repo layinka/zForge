@@ -44,11 +44,11 @@ export class TokenizeComponent implements OnInit {
         await this.blockchainService.approveToken(
           this.selectedToken,
           this.blockchainService.getCurrentChainContracts().syFactory, // SY Factory address
-          this.wrapAmount
+          this.wrapAmount.toString()
         );
       }
 
-      await this.blockchainService.wrapToken(this.selectedToken, this.wrapAmount);
+      await this.blockchainService.wrapToken(this.selectedToken, this.wrapAmount.toString());
       await this.tokenService.refreshAllBalances();
       
       // Reset form

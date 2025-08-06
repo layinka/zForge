@@ -123,8 +123,9 @@ export class Web3Service {
         this.chainId$.set(chainId);
       }
       const address = getAccount(wagmiAdapter.wagmiConfig);
+      console.log("W 1 Address: ", address.address);
       if(address && address.isConnected){
-        console.log("W 1 Address: ", address.address);
+        
         this.account$.set(address.address);
       }
     });

@@ -1,4 +1,4 @@
-import { effect, Injectable, signal, untracked } from '@angular/core';
+import { computed, effect, Injectable, signal, untracked } from '@angular/core';
 import { Web3Service } from './web3';
 import { TokenInfo, SYTokenInfo, BlockchainService } from './blockchain.service';
 import { environment, ChainContracts } from '../../environments/environment';
@@ -65,10 +65,9 @@ export class TokenService {
     });
   }
   
-  // Get available tokens for current chain
-  getAvailableTokens(): AvailableToken[] {
+  // Get available tokens for current chain (computed signal)
+  availableTokens = computed(() => {
     const chainId = this.web3Service.chainId || 31337;
-    console.log('chain: ', chainId);
     const contracts = environment.contracts[chainId];
     if (!contracts) {
       return [];
@@ -83,6 +82,11 @@ export class TokenService {
       }
       // Add more tokens per chain as needed
     ];
+  });
+
+  // Backward compatibility method
+  getAvailableTokens(): AvailableToken[] {
+    return this.availableTokens();
   }
   
   // Update current chain reactive signals from stored data

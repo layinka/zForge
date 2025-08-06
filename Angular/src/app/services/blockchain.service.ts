@@ -397,7 +397,9 @@ export class BlockchainService {
   }
 
   async approveToken(tokenAddress: string, spenderAddress: string, amount: string): Promise<void> {
-   console.log(tokenAddress, spenderAddress, amount);
+    console.log(spenderAddress as `0x${string}`);
+    console.log( parseEther(amount.toString()));
+   console.log(tokenAddress, spenderAddress, amount, [spenderAddress as `0x${string}`, parseEther(amount)]);
     await writeContract(wagmiAdapter.wagmiConfig, {
       address: tokenAddress as `0x${string}`,
       abi: ERC20_ABI,

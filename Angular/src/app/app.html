@@ -87,7 +87,11 @@
           <!-- <h1>Hello, {{ title() }} <ng-icon name="bootstrapHouse"></ng-icon>  </h1>
           <p>Congratulations! Your app is running. 🎉</p>
           <h2>Welcome</h2> -->
-
+          @if(!web3Service.account$()){
+            <div class="d-flex justify-content-center align-items-center m-2 mb-4 wallet-connection">
+              <app-w3m-core-button-wrapper></app-w3m-core-button-wrapper>
+            </div>
+          }
           <!-- <app-swap-form></app-swap-form> -->
           <router-outlet />
         </div>

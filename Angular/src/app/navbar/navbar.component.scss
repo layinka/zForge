@@ -192,34 +192,34 @@
   }
 }
 
-// Mobile responsive styles
-@media (max-width: 991.98px) {
-  .navbar-custom {
-    .navbar-collapse {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--navbar-border);
+// // Mobile responsive styles
+// @media (max-width: 991.98px) {
+//   .navbar-custom {
+//     .navbar-collapse {
+//       margin-top: 1rem;
+//       padding-top: 1rem;
+//       border-top: 1px solid var(--navbar-border);
       
-      .nav-menu {
-        .nav-item {
-          margin: 0.25rem 0;
+//       .nav-menu {
+//         .nav-item {
+//           margin: 0.25rem 0;
           
-          .nav-link-custom {
-            padding: 0.75rem 1rem;
-            margin: 0;
-          }
-        }
-      }
-    }
+//           .nav-link-custom {
+//             padding: 0.75rem 1rem;
+//             margin: 0;
+//           }
+//         }
+//       }
+//     }
     
-    .navbar-right {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--navbar-border);
-      justify-content: space-between;
-    }
-  }
-}
+//     .navbar-right {
+//       margin-top: 1rem;
+//       padding-top: 1rem;
+//       border-top: 1px solid var(--navbar-border);
+//       justify-content: space-between;
+//     }
+//   }
+// }
 
 // Animation for navbar on scroll
 .navbar-header.scrolled {
