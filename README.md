@@ -1,6 +1,6 @@
-# zPendle - Yield Tokenization Protocol
+# zForge - Yield Tokenization Protocol
 
-A full-stack decentralized application for yield tokenization, inspired by Pendle and Spectra protocols. zPendle allows users to wrap yield-bearing assets into standardized SY tokens, which can be split into Principal Tokens (PT) and Yield Tokens (YT) for advanced DeFi strategies.
+A full-stack decentralized application for yield tokenization, inspired by Pendle and Spectra protocols. zForge allows users to wrap yield-bearing assets into standardized SY tokens, which can be split into Principal Tokens (PT) and Yield Tokens (YT) for advanced DeFi strategies.
 
 ## 🌟 Features
 
