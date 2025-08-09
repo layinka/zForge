@@ -59,6 +59,17 @@ export const useNativeChainCoinList = [
   
 ]
 
+export function getMultiCallAddress(chainId: number){
+  let multicall=chains[chainId].contracts?.multicall3?.address;
+  if(chainId===31337){
+    multicall="0x4C0eCEa6778C911A0F6806492Fca37C98c3a43Bd";
+  }
+  if(!multicall){
+    throw new Error("Multicall address not found for chainId: " + chainId);
+  }
+  return multicall;
+}
+
 
 @Injectable({
   providedIn: 'root'

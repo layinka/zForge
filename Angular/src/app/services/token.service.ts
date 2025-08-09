@@ -44,7 +44,7 @@ export class TokenService {
         untracked(() => {
           this.updateCurrentChainSignals();
           // Refresh data for new chain if wallet is connected
-          if (this.blockchainService.isWalletConnected) {
+          if (this.web3Service.account$()) {
             this.refreshAllBalances();
           }
         });
@@ -173,7 +173,7 @@ export class TokenService {
   }
 
   async refreshAllBalances(): Promise<void> {
-    if (!this.blockchainService.isWalletConnected) return;
+    if (!this.blockchainService.isConnected()) return;
 
     const chainId = this.web3Service.chainId || 31337;
     

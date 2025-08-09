@@ -2,208 +2,8 @@ import { computed, effect, Injectable, signal } from '@angular/core';
 import { readContract, writeContract, multicall } from '@wagmi/core';
 import { formatEther, parseEther, formatUnits } from 'viem';
 import { environment, ChainContracts } from '../../environments/environment';
-import { Web3Service, wagmiAdapter } from './web3';
-
-// Contract ABIs (proper ABI format for wagmi)
-const SY_FACTORY_ABI = [
-  {
-    name: 'wrap',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'underlying', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'address' }]
-  },
-  {
-    name: 'split',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'syTokenAddress', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [
-      { name: '', type: 'address' },
-      { name: '', type: 'address' }
-    ]
-  },
-  {
-    name: 'merge',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'syTokenAddress', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'address' }]
-  },
-  {
-    name: 'redeemPT',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'ptTokenAddress', type: 'address' }],
-    outputs: []
-  },
-  {
-    name: 'claimYT',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'ytTokenAddress', type: 'address' }],
-    outputs: []
-  },
-  {
-    name: 'getSYToken',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'underlying', type: 'address' }],
-    outputs: [{ name: '', type: 'address' }]
-  },
-  {
-    name: 'getTokenPair',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'syToken', type: 'address' }],
-    outputs: [
-      { name: 'pt', type: 'address' },
-      { name: 'yt', type: 'address' }
-    ]
-  },
-  {
-    name: 'getAllSYTokens',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'address[]' }]
-  }
-] as const;
-
-const SY_TOKEN_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'approve',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  },
-  {
-    name: 'allowance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' }
-    ],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'underlyingToken',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'address' }]
-  },
-  {
-    name: 'maturity',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'hasMatured',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'bool' }]
-  },
-  {
-    name: 'timeToMaturity',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'getClaimableYield',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'user', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }]
-  }
-] as const;
-
-const ERC20_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'approve',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  },
-  {
-    name: 'allowance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' }
-    ],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'transfer',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  },
-  {
-    name: 'name',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'string' }]
-  },
-  {
-    name: 'symbol',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'string' }]
-  },
-  {
-    name: 'decimals',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint8' }]
-  }
-] as const;
+import { Web3Service, getMultiCallAddress, wagmiAdapter } from './web3';
+import { SY_FACTORY_ABI, SY_TOKEN_ABI, PT_TOKEN_ABI, YT_TOKEN_ABI, ERC20_ABI } from '../abis';
 
 export interface TokenInfo {
   address: string;
@@ -221,6 +21,7 @@ export interface SYTokenInfo extends TokenInfo {
   ptAddress: string;
   ytAddress: string;
   claimableYield: string;
+  yieldRate: bigint;
 }
 
 @Injectable({
@@ -228,7 +29,7 @@ export interface SYTokenInfo extends TokenInfo {
 })
 export class BlockchainService {
   // Signals for reactive UI (derived from Web3Service)
-  public isConnected = computed(() => !!this.web3Service.account);
+  public isConnected = computed(() => !!this.web3Service.account$());
 
   constructor(private web3Service: Web3Service) {
     
@@ -236,16 +37,13 @@ export class BlockchainService {
 
   // Convenience getters
   get currentAddress(): string | undefined {
-    return this.web3Service.account;
+    return this.web3Service.account$();
   }
 
   get currentChainId(): number | undefined {
-    return this.web3Service.chainId;
+    return this.web3Service.chainId$();
   }
 
-  get isWalletConnected(): boolean {
-    return !!this.web3Service.account;
-  }
 
   // Get contracts for current chain
   getCurrentChainContracts(): ChainContracts {
@@ -347,10 +145,17 @@ export class BlockchainService {
         {
           address: this.getCurrentChainContracts().syFactory as `0x${string}`,
           abi: SY_FACTORY_ABI,
-          functionName: 'getTokenPair',
+          functionName: 'getTokenPairByStToken',
           args: [syTokenAddress as `0x${string}`]
+        },
+        {
+          address: syTokenAddress as `0x${string}`,
+          abi: SY_TOKEN_ABI,
+          functionName: 'yieldRate'
         }
-      ]
+      ],
+      //Todo - Change to work with chain passed in as arg instead of conneted chain
+      multicallAddress: getMultiCallAddress(this.web3Service.chainId$() || 31337)
     });
 
     // Extract results from multicall
@@ -361,6 +166,7 @@ export class BlockchainService {
     const timeToMaturity = multicallResults[4].result as bigint;
     const claimableYield = multicallResults[5].result as bigint;
     const tokenPair = multicallResults[6].result as [string, string];
+    const yieldRate = multicallResults[7].result as bigint;
 
     const [name, symbol, decimals] = await Promise.all([
       readContract(wagmiAdapter.wagmiConfig, {
@@ -392,8 +198,32 @@ export class BlockchainService {
       timeToMaturity: Number(timeToMaturity),
       ptAddress: tokenPair[0],
       ytAddress: tokenPair[1],
-      claimableYield: formatUnits(claimableYield, decimals)
+      claimableYield: formatUnits(claimableYield, decimals),
+      yieldRate
     };
+  }
+
+  async getMaturityInfo(underlyingAddress: string): Promise<{ syTokens: string[] }> {
+    try {
+      const maturities = await this.getAvailableMaturities(underlyingAddress);
+      const syTokens: string[] = [];
+      
+      for (const maturity of maturities) {
+        const syTokenAddress = await readContract(wagmiAdapter.wagmiConfig, {
+          address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+          abi: SY_FACTORY_ABI,
+          functionName: 'getSYTokenByMaturity',
+          args: [underlyingAddress as `0x${string}`, BigInt(maturity)]
+        }) as string;
+        
+        syTokens.push(syTokenAddress);
+      }
+      
+      return { syTokens };
+    } catch (error) {
+      console.error('Error getting maturity info:', error);
+      return { syTokens: [] };
+    }
   }
 
   async approveToken(tokenAddress: string, spenderAddress: string, amount: string): Promise<void> {
@@ -460,6 +290,23 @@ export class BlockchainService {
       functionName: 'getAllSYTokens',
       args: []
     }) as string[];
+  }
+
+  async getAllUnderlyingTokens(): Promise<string[]> {
+    return await readContract(wagmiAdapter.wagmiConfig, {
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+      abi: SY_FACTORY_ABI,
+      functionName: 'getAllUnderlyingTokens' as any
+    }) as string[];
+  }
+
+  async getAvailableMaturities(underlyingToken: string): Promise<bigint[]> {
+    return await readContract(wagmiAdapter.wagmiConfig, {
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+      abi: SY_FACTORY_ABI,
+      functionName: 'getAvailableMaturities' as any,
+      args: [underlyingToken as `0x${string}`]
+    }) as unknown as bigint[];
   }
 
   // Utility methods

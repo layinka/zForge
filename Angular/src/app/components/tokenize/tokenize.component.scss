@@ -5,6 +5,116 @@
   background-clip: text;
 }
 
+// Token Cards Styling
+.token-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border-color: rgba(102, 126, 234, 0.3);
+  }
+  
+  .card-body {
+    padding: 1.5rem;
+  }
+  
+  .token-icon {
+    .bg-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+  }
+  
+  .apy-badge {
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+    border-radius: 12px;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+  
+  .badge {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 500;
+    
+    &.bg-light {
+      background-color: rgba(108, 117, 125, 0.1) !important;
+      color: #6c757d !important;
+      border-color: rgba(108, 117, 125, 0.2) !important;
+    }
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    &:active {
+      transform: translateY(0);
+    }
+  }
+}
+
+// Loading State
+.text-center.py-5 {
+  .bi-hourglass-split {
+    color: rgba(102, 126, 234, 0.6);
+    animation: pulse 2s infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .token-card {
+    .card-body {
+      padding: 1.25rem;
+    }
+    
+    .token-icon {
+      .bg-primary {
+        width: 40px !important;
+        height: 40px !important;
+        
+        i {
+          font-size: 1.2rem !important;
+        }
+      }
+    }
+    
+    .apy-badge {
+      padding: 0.75rem;
+      
+      .h3 {
+        font-size: 1.5rem !important;
+      }
+    }
+  }
+}
+
 .balance-card {
   border: 1px solid rgba(99, 102, 241, 0.2);
   transition: all 0.3s ease;

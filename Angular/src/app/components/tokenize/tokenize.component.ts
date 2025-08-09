@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, effect, OnInit, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
@@ -6,6 +6,15 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { BlockchainService } from '../../services/blockchain.service';
 import { TokenService, AvailableToken } from '../../services/token.service';
 import { AppToastService } from '@app/services/app-toast.service';
+import { Web3Service } from '@app/services/web3';
+
+interface TokenInfo {
+  address: string;
+  symbol: string;
+  name: string;
+  apy: number;
+  maturities: { maturity: bigint; syTokenAddress: string; }[];
+}
 
 @Component({
   selector: 'app-tokenize',
@@ -20,17 +29,116 @@ export class TokenizeComponent implements OnInit {
   selectedSYToken = '';
   splitAmount = '';
   isProcessing = signal(false);
+  availableTokens = signal<TokenInfo[]>([]);
 
   constructor(
     public blockchainService: BlockchainService,
     public tokenService: TokenService,
     public toastService: AppToastService,
+    public web3Service: Web3Service,
     // private spinner: NgxSpinnerService
-  ) {}
+  ) {
+    effect(() => {
+      const account = this.web3Service.account$();
+      console.log('TKN Account signal changed:', account);
+      untracked(() => {
+        if (account) {
+          this.tokenService.refreshAllBalances();
+          this.loadAvailableTokens();
+        } 
+      });
+    });
+  }
 
   ngOnInit() {
-    if (this.blockchainService.isConnected()) {
-      this.tokenService.refreshAllBalances();
+    
+  }
+
+  async loadAvailableTokens() {
+    try {
+      // Get all underlying tokens from SYFactory
+      const underlyingTokens = await this.blockchainService.getAllUnderlyingTokens();
+      
+      const tokens: TokenInfo[] = [];
+      
+      for (const underlyingAddress of underlyingTokens) {
+        try {
+          // Get token info (name, symbol)
+          const tokenInfo = await this.blockchainService.getTokenInfo(underlyingAddress);
+          
+          // Get available maturities for this underlying token
+          const maturities = await this.blockchainService.getAvailableMaturities(underlyingAddress);
+          
+          // Get maturity info (SY token addresses and active status)
+          const maturityInfo = await this.blockchainService.getMaturityInfo(underlyingAddress);
+          
+          // Build maturity options with SY token addresses
+          const maturityOptions = maturities.map((maturity, index) => ({
+            maturity: BigInt(maturity),
+            syTokenAddress: maturityInfo.syTokens[index] || '0x0'
+          })).filter(option => option.syTokenAddress !== '0x0');
+          
+          if (maturityOptions.length > 0) {
+            // Calculate APY from the first available SY token's yield rate
+            let apy = 0;
+            try {
+              const firstSYToken = maturityOptions[0].syTokenAddress;
+              const syTokenInfo = await this.blockchainService.getSYTokenInfo(firstSYToken);
+              console.log('SY Token Info:', syTokenInfo);
+              // Convert yield rate (basis points) to APY percentage
+              // yieldRate is in basis points (1 basis point = 0.01%)
+              apy = Number(syTokenInfo.yieldRate) / 100; // Convert basis points to percentage
+            } catch (apyError) {
+              console.warn('Could not calculate APY for token:', tokenInfo.symbol, apyError);
+              apy = 0;
+            }
+            
+            tokens.push({
+              address: underlyingAddress,
+              symbol: tokenInfo.symbol,
+              name: tokenInfo.name,
+              apy: apy,
+              maturities: maturityOptions
+            });
+          }
+        } catch (tokenError) {
+          console.warn('Error processing underlying token:', underlyingAddress, tokenError);
+        }
+      }
+      
+      this.availableTokens.set(tokens);
+    } catch (error) {
+      console.error('Error loading available tokens:', error);
+      this.toastService.error('Error', 'Failed to load available tokens');
+    }
+  }
+
+  formatMaturityPeriod(maturity: bigint): string {
+    const now = Math.floor(Date.now() / 1000);
+    const maturitySeconds = Number(maturity);
+    const diffSeconds = maturitySeconds - now;
+    
+    if (diffSeconds <= 0) return 'Expired';
+    
+    const days = Math.floor(diffSeconds / (24 * 60 * 60));
+    const months = Math.floor(days / 30);
+    
+    if (months >= 12) {
+      const years = Math.floor(months / 12);
+      return `${years}Y`;
+    } else if (months >= 1) {
+      return `${months}M`;
+    } else {
+      return `${days}D`;
+    }
+  }
+
+  selectToken(token: TokenInfo) {
+    this.selectedToken = token.address;
+    // Scroll to wrap section
+    const wrapSection = document.querySelector('.row.g-4');
+    if (wrapSection) {
+      wrapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 

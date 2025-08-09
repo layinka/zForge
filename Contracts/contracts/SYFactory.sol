@@ -54,6 +54,7 @@ contract SYFactory is Ownable, ReentrancyGuard {
     // Keep existing mappings for backward compatibility
     mapping(address => TokenPair) public syTokenPairs; // SY token => PT/YT pair
     address[] public allSYTokens;
+    address[] public underlyingTokens; // Track all underlying tokens
     
     // Configuration
     uint256 public constant MIN_MATURITY_DURATION = 1 days;
@@ -164,6 +165,11 @@ contract SYFactory is Ownable, ReentrancyGuard {
         maturityExists[underlying][maturity] = true;
         allSYTokens.push(address(syToken));
         
+        // Add underlying token to list if it's the first time
+        if (availableMaturities[underlying].length == 1) {
+            underlyingTokens.push(underlying);
+        }
+        
         emit SYTokenCreated(underlying, address(syToken), maturity, yieldRate, msg.sender);
         emit MaturityOptionAdded(underlying, maturity, address(syToken));
         
@@ -198,6 +204,13 @@ contract SYFactory is Ownable, ReentrancyGuard {
      */
     function hasMaturityOption(address underlying, uint256 maturity) external view returns (bool) {
         return maturityExists[underlying][maturity];
+    }
+    
+    /**
+     * @dev Get all underlying tokens that have SY tokens created
+     */
+    function getAllUnderlyingTokens() external view returns (address[] memory) {
+        return underlyingTokens;
     }
     
     /**
