@@ -1,0 +1,94 @@
+.step-indicator {
+  .badge {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+  }
+}
+
+.maturity-option {
+  padding: 1rem;
+  text-align: left;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  &.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: white;
+    
+    .text-muted {
+      color: rgba(255, 255, 255, 0.8) !important;
+    }
+    
+    .text-success {
+      color: rgba(255, 255, 255, 0.9) !important;
+    }
+  }
+}
+
+.form-control-lg {
+  font-size: 1.125rem;
+  padding: 0.75rem 1rem;
+}
+
+.input-group .form-control {
+  border-right: none;
+}
+
+.input-group .btn {
+  border-left: none;
+  border-right: none;
+}
+
+.input-group .input-group-text {
+  border-left: none;
+  background-color: var(--bs-light);
+  color: var(--bs-secondary);
+  font-weight: 500;
+}
+
+.alert-light {
+  background-color: #f8f9fa;
+  border-color: #e9ecef;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.125rem;
+}
+
+// Animation for step transitions
+.card {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .maturity-option {
+    padding: 0.75rem;
+  }
+  
+  .btn-lg {
+    padding: 0.625rem 1.25rem;
+    font-size: 1rem;
+  }
+}

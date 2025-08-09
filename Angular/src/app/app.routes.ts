@@ -15,8 +15,16 @@ export const routes: Routes = [
     loadComponent: () => import('./components/ptyt/ptyt.component').then(m => m.PtytComponent)
   },
   {
+    path: 'ptyt/:u/:m',
+    loadComponent: () => import('./components/ptyt/ptyt.component').then(m => m.PtytComponent)
+  },
+  {
     path: 'pools',
     loadComponent: () => import('./components/pools/pools.component').then(m => m.PoolsComponent)
+  },
+  {
+    path: 'stake/:tokenAddress',
+    loadComponent: () => import('./components/staking/staking.component').then(m => m.StakingComponent)
   },
   {
     path: '**',

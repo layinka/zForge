@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+// import "hardhat/console.sol";
 
 /**
  * @title SYToken
@@ -178,13 +179,41 @@ contract SYToken is ERC20, Ownable, ReentrancyGuard {
         if (owner() != msg.sender) revert OnlyFactoryCanCall();
         if (amount == 0) revert AmountMustBeGreaterThanZero();
         if (block.timestamp >= maturity) revert TokenHasMatured();
-        
+                
         _mint(to, amount);
+        
+        // console.log("mintTo: Balance after mint:", balanceOf(to));
         
         // Set lastClaimTime if this is the first time user receives tokens
         if (lastClaimTime[to] == 0) {
             lastClaimTime[to] = block.timestamp;
         }
+    }
+    
+    /**
+     * @dev Burn SY tokens (only callable by SYFactory)
+     * @param from Address to burn tokens from
+     * @param amount Amount of tokens to burn
+     */
+    function burnFrom(address from, uint256 amount) external {
+        // Only allow SYFactory to call this function
+        if (owner() != msg.sender) revert OnlyFactoryCanCall();
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        
+        // Debug: Check balance before burning
+        uint256 currentBalance = balanceOf(from);
+        // console.log("burnFrom: Burning from address: %s %d", from, amount);
+        // console.log("burnFrom: Current balance: %d", currentBalance);
+        
+        if (currentBalance < amount) {
+            revert InsufficientSYBalance(); // Debug: This will show if error is from burnFrom
+        }
+        
+        if (balanceOf(from) < amount) revert InsufficientSYBalance();
+        
+        _burn(from, amount);
+        
+        // console.log("burnFrom: Balance after burn:", balanceOf(from));
     }
     
     /**

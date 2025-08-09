@@ -1,12 +1,14 @@
-import { Component, effect, OnInit, signal, untracked } from '@angular/core';
+import { Component, effect, OnInit, signal, untracked, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
+import { Router } from '@angular/router';
 // import { NgxSpinnerService } from 'ngx-spinner';
 import { BlockchainService } from '../../services/blockchain.service';
 import { TokenService, AvailableToken } from '../../services/token.service';
 import { AppToastService } from '@app/services/app-toast.service';
 import { Web3Service } from '@app/services/web3';
+import { ErrorDecoder } from '../../utils/error-decoder';
 
 interface TokenInfo {
   address: string;
@@ -31,6 +33,8 @@ export class TokenizeComponent implements OnInit {
   isProcessing = signal(false);
   availableTokens = signal<TokenInfo[]>([]);
 
+  private router = inject(Router);
+
   constructor(
     public blockchainService: BlockchainService,
     public tokenService: TokenService,
@@ -51,7 +55,19 @@ export class TokenizeComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Make ErrorDecoder available globally for testing
+    (window as any).testErrorDecoder = ErrorDecoder.testWithKnownError;
+    (window as any).debugError = (error: any) => {
+      console.log('🔧 Manual error debugging:');
+      ErrorDecoder.debugErrorStructure(error);
+      const result = ErrorDecoder.extractErrorFromException(error);
+      console.log('Decode result:', result);
+      return result;
+    };
     
+    console.log('💡 ErrorDecoder test functions available:');
+    console.log('  - testErrorDecoder() - Test with known error signatures');
+    console.log('  - debugError(yourError) - Debug your actual error structure');
   }
 
   async loadAvailableTokens() {
@@ -134,12 +150,8 @@ export class TokenizeComponent implements OnInit {
   }
 
   selectToken(token: TokenInfo) {
-    this.selectedToken = token.address;
-    // Scroll to wrap section
-    const wrapSection = document.querySelector('.row.g-4');
-    if (wrapSection) {
-      wrapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // Navigate to staking component with token address
+    this.router.navigate(['/stake', token.address]);
   }
 
   async wrapAsset() {
@@ -158,7 +170,16 @@ export class TokenizeComponent implements OnInit {
         );
       }
 
-      await this.blockchainService.wrapToken(this.selectedToken, this.wrapAmount.toString());
+      // Get available maturities for the selected token
+      const maturities = await this.blockchainService.getAvailableMaturities(this.selectedToken);
+      if (maturities.length === 0) {
+        this.toastService.error('Error', 'No maturity options available for this token');
+        return;
+      }
+      
+      // Use the first available maturity
+      const selectedMaturity = maturities[0];
+      await this.blockchainService.wrapAndSplit(this.selectedToken, this.wrapAmount.toString(), selectedMaturity);
       await this.tokenService.refreshAllBalances();
       this.toastService.show('Wrap successful', 'Your asset has been wrapped into SY tokens');
       
@@ -167,7 +188,34 @@ export class TokenizeComponent implements OnInit {
       
     } catch (error: any) {
       console.error('Error wrapping asset:', error);
-      this.toastService.error('Wrap failed', 'Failed to wrap asset');
+      
+      // Try to decode Solidity custom error
+      const decodedError = ErrorDecoder.extractErrorFromException(error);
+      
+      if (decodedError) {
+        console.log(' Decoded Solidity Error:');
+        console.log(`  Error Name: ${decodedError.errorName}`);
+        console.log(`  Error Message: ${decodedError.errorMessage}`);
+        console.log(`  Error Signature: ${decodedError.signature}`);
+        console.log(`  Raw Data: ${decodedError.rawData}`);
+        
+        // Show user-friendly error message
+        this.toastService.error('Wrap Failed', decodedError.errorMessage);
+      } else {
+        // Fallback for non-custom errors
+        let errorMessage = 'Failed to wrap asset';
+        
+        if (error && typeof error === 'object') {
+          if ('message' in error && typeof error.message === 'string') {
+            errorMessage = error.message;
+          } else if ('reason' in error && typeof error.reason === 'string') {
+            errorMessage = error.reason;
+          }
+        }
+        
+        console.log(' Non-custom error:', errorMessage);
+        this.toastService.error('Wrap Failed', errorMessage);
+      }
     } finally {
       this.isProcessing.set(false);
       // this.spinner.hide();
@@ -189,7 +237,34 @@ export class TokenizeComponent implements OnInit {
       
     } catch (error: any) {
       console.error('Error splitting SY token:', error);
-      // Handle error (show toast)
+      
+      // Try to decode Solidity custom error
+      const decodedError = ErrorDecoder.extractErrorFromException(error);
+      
+      if (decodedError) {
+        console.log('🔍 Decoded Solidity Error:');
+        console.log(`  Error Name: ${decodedError.errorName}`);
+        console.log(`  Error Message: ${decodedError.errorMessage}`);
+        console.log(`  Error Signature: ${decodedError.signature}`);
+        console.log(`  Raw Data: ${decodedError.rawData}`);
+        
+        // Show user-friendly error message
+        this.toastService.error('Split Failed', decodedError.errorMessage);
+      } else {
+        // Fallback for non-custom errors
+        let errorMessage = 'Failed to split SY token';
+        
+        if (error && typeof error === 'object') {
+          if ('message' in error && typeof error.message === 'string') {
+            errorMessage = error.message;
+          } else if ('reason' in error && typeof error.reason === 'string') {
+            errorMessage = error.reason;
+          }
+        }
+        
+        console.log('❌ Non-custom error:', errorMessage);
+        this.toastService.error('Split Failed', errorMessage);
+      }
     } finally {
       this.isProcessing.set(false);
       // this.spinner.hide();

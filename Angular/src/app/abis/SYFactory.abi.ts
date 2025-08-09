@@ -864,10 +864,25 @@ export const SY_FACTORY_ABI = [
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maturity",
+        "type": "uint256"
       }
     ],
-    "name": "wrap",
+    "name": "wrapAndSplit",
     "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
       {
         "internalType": "address",
         "name": "",

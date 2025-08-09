@@ -58,7 +58,7 @@
                 <button class="btn btn-primary w-100" 
                         (click)="selectToken(token)">
                   <i class="bi bi-plus-circle me-2"></i>
-                  Tokenize {{ token.symbol }}
+                  Stake {{ token.symbol }}
                 </button>
               </div>
             </div>
@@ -80,9 +80,9 @@
     </div>
   </div>
 </div>
-
+<!-- 
 <div class="row g-4">
-  <!-- Wrap Section -->
+  
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
@@ -165,7 +165,7 @@
     </div>
   </div>
 
-  <!-- Split Section -->
+  
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
@@ -245,7 +245,7 @@
       </div>
     </div>
   </div>
-</div>
+</div> -->
 
 <!-- Portfolio Overview -->
 <div class="row mt-5">
@@ -263,7 +263,7 @@
             <div class="balance-card card text-center p-3">
               <h6 class="text-muted mb-1">Total Value</h6>
               <h4 class="gradient-text mb-0">
-                ${{ (tokenService.getTotalPortfolioValue() * 1500).toFixed(2) }}
+                ${{ (tokenService.getTotalPortfolioValue()).toFixed(2) | number}}
               </h4>
             </div>
           </div>
@@ -287,36 +287,52 @@
           </div>
         </div>
 
-        @if (tokenService.syTokens().length > 0) {
-          <div class="mt-4">
-            <h6 class="fw-semibold mb-3">Your SY Tokens</h6>
+        @if (tokenService.aggregatedSYTokens().length > 0) {
+          <div class="mt-5">
+            <h6 class="fw-semibold mb-3">Your SY Tokens (Aggregated by Underlying)</h6>
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
                   <tr>
-                    <th>Token</th>
-                    <th>Balance</th>
-                    <th>Maturity</th>
+                    <th>Underlying Token</th>
+                    <th>Total Balance</th>
+                    <th>Positions</th>
+                    <th>Maturities</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (syToken of tokenService.syTokens(); track syToken.address) {
+                  @for (aggregatedToken of tokenService.aggregatedSYTokens(); track aggregatedToken.underlyingAddress) {
                     <tr>
                       <td>
                         <div class="d-flex align-items-center">
-                          <span class="token-badge me-2">{{ syToken.symbol }}</span>
-                          {{ syToken.name }}
+                          <span class="token-badge me-2">{{ aggregatedToken.underlyingSymbol }}</span>
+                          {{ aggregatedToken.underlyingName }}
                         </div>
                       </td>
-                      <td>{{ blockchainService.formatBalance(syToken.balance) }}</td>
-                      <td>{{ tokenService.formatMaturity(syToken.maturity) }}</td>
                       <td>
-                        @if (syToken.hasMatured) {
-                          <span class="badge bg-danger">Matured</span>
-                        } @else {
-                          <span class="badge bg-success">Active</span>
-                        }
+                        <strong>{{ aggregatedToken.totalBalance.toFixed(4) | number }}</strong>
+                        <small class="text-muted d-block">{{ aggregatedToken.underlyingSymbol }}</small>
+                      </td>
+                      <td>
+                        <span class="badge bg-info">{{ aggregatedToken.tokenCount }} position{{ aggregatedToken.tokenCount > 1 ? 's' : '' }}</span>
+                      </td>
+                      <td>
+                        <div class="d-flex flex-wrap gap-1">
+                          @for (maturity of aggregatedToken.maturities; track maturity) {
+                            <span class="badge bg-light text-dark border">{{ maturity }}</span>
+                          }
+                        </div>
+                      </td>
+                      <td>
+                        <div class="d-flex flex-column gap-1">
+                          @if (aggregatedToken.hasActiveTokens) {
+                            <span class="badge bg-success">Active</span>
+                          }
+                          @if (aggregatedToken.hasMaturedTokens) {
+                            <span class="badge bg-danger">Matured</span>
+                          }
+                        </div>
                       </td>
                     </tr>
                   }

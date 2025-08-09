@@ -1,9 +1,11 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { BlockchainService } from '../../services/blockchain.service';
+import { ActivatedRoute } from '@angular/router';
+import { BlockchainService, SYTokenInfo } from '../../services/blockchain.service';
 import { TokenService } from '../../services/token.service';
+import { AppToastService } from '../../services/app-toast.service';
 
 @Component({
   selector: 'app-ptyt',
@@ -16,17 +18,119 @@ export class PtytComponent implements OnInit {
   selectedSYForMerge = '';
   mergeAmount = '';
   isProcessing = signal(false);
-  parseFloat=parseFloat;
+  parseFloat = parseFloat;
+  
+  // Selected SY token for filtering PT/YT tokens
+  selectedSYToken = signal<SYTokenInfo | null>(null);
+  
+  // Computed signals for filtered PT/YT tokens
+  filteredPTTokens = computed(() => {
+    const ptTokens = this.tokenService.ptTokens();
+    const selectedSY = this.selectedSYToken();
+    
+    if (!selectedSY) {
+      return ptTokens.filter(token => parseFloat(token.balance || '0') > 0);
+    }
+    
+    // Filter by SY token's PT address and non-zero balance
+    return ptTokens.filter(token => 
+      token.address.toLowerCase() === selectedSY.ptAddress.toLowerCase() &&
+      parseFloat(token.balance || '0') > 0
+    );
+  });
+  
+  filteredYTTokens = computed(() => {
+    const ytTokens = this.tokenService.ytTokens();
+    const selectedSY = this.selectedSYToken();
+    
+    if (!selectedSY) {
+      return ytTokens.filter(token => parseFloat(token.balance || '0') > 0);
+    }
+    
+    // Filter by SY token's YT address and non-zero balance
+    return ytTokens.filter(token => 
+      token.address.toLowerCase() === selectedSY.ytAddress.toLowerCase() &&
+      parseFloat(token.balance || '0') > 0
+    );
+  });
+  
+  // Computed signal for available SY tokens for merging (with non-zero balance)
+  availableSYTokensForMerge = computed(() => {
+    return this.tokenService.syTokens().filter(token => 
+      parseFloat(token.balance || '0') > 0
+    );
+  });
+  
+  // New properties for staking results
+  stakingResult = signal<{
+    underlying: string;
+    maturity: string;
+    syTokenInfo?: SYTokenInfo;
+    underlyingTokenInfo?: any;
+    showCelebration: boolean;
+  } | null>(null);
+  
+  private route = inject(ActivatedRoute);
+  private toastService = inject(AppToastService);
 
   constructor(
     public blockchainService: BlockchainService,
     public tokenService: TokenService
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     if (this.blockchainService.isConnected()) {
       this.tokenService.refreshAllBalances();
     }
+    
+    // Check for staking result route parameters
+    const underlying = this.route.snapshot.paramMap.get('u');
+    const maturity = this.route.snapshot.paramMap.get('m');
+    
+    if (underlying && maturity) {
+      await this.loadStakingResult(underlying, maturity);
+      // Set the selected SY token based on route parameters
+      await this.setSelectedSYTokenFromParams(underlying, maturity);
+    }
+  }
+  
+  private async setSelectedSYTokenFromParams(underlying: string, maturity: string) {
+    // Wait for tokens to be loaded
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const syTokens = this.tokenService.syTokens();
+    const matchingSYToken = syTokens.find(token => 
+      token.underlying.toLowerCase() === underlying.toLowerCase() &&
+      token.maturity.toString() === maturity
+    );
+    
+    if (matchingSYToken) {
+      this.selectedSYToken.set(matchingSYToken);
+    }
+  }
+  
+  // Method to manually select SY token for filtering
+  selectSYToken(syToken: SYTokenInfo | null) {
+    this.selectedSYToken.set(syToken);
+  }
+  
+  // Handle SY token filter change from dropdown
+  onSYTokenFilterChange(syTokenAddress: string) {
+    if (!syTokenAddress) {
+      this.selectedSYToken.set(null);
+      return;
+    }
+    
+    const syToken = this.tokenService.syTokens().find(token => 
+      token.address === syTokenAddress
+    );
+    
+    this.selectedSYToken.set(syToken || null);
+  }
+  
+  // Format maturity timestamp to readable date
+  formatMaturity(maturity: number): string {
+    return this.tokenService.formatMaturity(maturity);
   }
 
   async redeemPT(ptTokenAddress: string) {
@@ -150,5 +254,63 @@ export class PtytComponent implements OnInit {
   isYTExpired(ytTokenAddress: string): boolean {
     const syToken = this.tokenService.syTokens().find(t => t.ytAddress === ytTokenAddress);
     return syToken ? syToken.hasMatured : false;
+  }
+
+  // New methods for staking results
+  async loadStakingResult(underlying: string, maturity: string) {
+    try {
+      // Get SY token address for this underlying and maturity
+      const syTokenAddress = await this.blockchainService.getSYTokenByMaturity(underlying, BigInt(maturity));
+      
+      if (syTokenAddress && syTokenAddress !== '0x0000000000000000000000000000000000000000') {
+        // Load SY token info and underlying token info
+        const [syTokenInfo, underlyingTokenInfo] = await Promise.all([
+          this.blockchainService.getSYTokenInfo(syTokenAddress),
+          this.blockchainService.getTokenInfo(underlying)
+        ]);
+        
+        this.stakingResult.set({
+          underlying,
+          maturity,
+          syTokenInfo,
+          underlyingTokenInfo,
+          showCelebration: true
+        });
+        
+        // Show success message
+        this.toastService.show('Success!', 'Your tokens have been successfully staked!');
+        
+        // Hide celebration after 5 seconds
+        setTimeout(() => {
+          const current = this.stakingResult();
+          if (current) {
+            this.stakingResult.set({ ...current, showCelebration: false });
+          }
+        }, 5000);
+        
+        // Refresh balances to show new PT/YT tokens
+        await this.tokenService.refreshAllBalances();
+      }
+    } catch (error) {
+      console.error('Error loading staking result:', error);
+      this.toastService.error('Error', 'Failed to load staking information');
+    }
+  }
+
+  formatMaturityDate(maturity: string): string {
+    const date = new Date(Number(maturity) * 1000);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  }
+
+  calculateAPY(yieldRate: bigint): number {
+    return Number(yieldRate) / 100; // Convert basis points to percentage
+  }
+
+  dismissStakingResult() {
+    this.stakingResult.set(null);
   }
 }

@@ -739,6 +739,24 @@ const config: HardhatUserConfig = {
           },
         },
       },
+
+      'contracts/SYToken.sol': {
+        version: '0.8.30',
+        settings: {
+          viaIR: true,
+          optimizer: {
+            enabled: true,
+            runs: 5,
+            details: {
+              yul: true,
+            },
+          },
+          metadata: {
+            bytecodeHash: 'none',
+          },
+        },
+      },
+      
     },
   },
   spdxLicenseIdentifier: {

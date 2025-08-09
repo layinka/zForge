@@ -130,13 +130,10 @@ export class Web3Service {
     reconnect(wagmiAdapter.wagmiConfig).then(()=>{
       const chainId = getChainId(wagmiAdapter.wagmiConfig);
       if(chainId){
-        console.log("W 1 ChainId: ", chainId);
         this.chainId$.set(chainId);
       }
       const address = getAccount(wagmiAdapter.wagmiConfig);
-      console.log("W 1 Address: ", address.address);
-      if(address && address.isConnected){
-        
+      if(address && address.isConnected){        
         this.account$.set(address.address);
       }
     });

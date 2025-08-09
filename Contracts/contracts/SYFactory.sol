@@ -1,16 +1,48 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./SYToken.sol";
 import "./PTToken.sol";
 import "./YTToken.sol";
+// import "hardhat/console.sol";
 
 /**
- * @title SYFactory with User-Chosen Maturity
- * @dev Enhanced factory contract allowing users to choose their own maturity periods
+ * @title SYFactory - Yield Tokenization Factory
+ * @dev Enhanced factory contract for creating and managing yield-bearing tokens with user-chosen maturities
+ * 
+ * This contract provides three main user flows for yield tokenization:
+ * 
+ * 1. SY TOKENS ONLY (wrapWithMaturity):
+ *    - For users who want simple yield-bearing exposure
+ *    - SY tokens automatically earn yield until maturity
+ *    - Single token to manage, composable with other DeFi protocols
+ *    - Can be split later when market conditions are favorable
+ *    - Use cases: yield farming, liquidity provision, collateral, hold-and-earn strategies
+ * 
+ * 2. PT + YT TOKENS (wrapAndSplit):
+ *    - For users who want to separate principal and yield
+ *    - Most common flow for advanced yield strategies
+ *    - Single transaction combines wrap + split for gas efficiency
+ *    - Use cases: yield trading, arbitrage, portfolio diversification, risk management
+ * 
+ * 3. EXISTING SY TOKENS (split):
+ *    - For users who already hold SY tokens from other sources
+ *    - Allows timing strategies and partial splitting
+ *    - Use cases: received SY tokens, market timing, partial position management
+ * 
+ * TOKEN TYPES:
+ * - SY (Standardized Yield): Yield-bearing tokens that represent principal + yield
+ * - PT (Principal Token): Fixed-value tokens redeemable for underlying at maturity
+ * - YT (Yield Token): Tokens that capture all yield generated until maturity
+ * 
+ * ARCHITECTURE:
+ * - Multi-maturity support: Multiple SY tokens per underlying with different maturities
+ * - User-chosen maturities: Users can create custom maturity periods
+ * - Atomic operations: wrapAndSplit ensures all-or-nothing execution
+ * - Gas optimization: Combined operations reduce transaction costs
  */
 contract SYFactory is Ownable, ReentrancyGuard {
     // Custom errors
@@ -49,7 +81,7 @@ contract SYFactory is Ownable, ReentrancyGuard {
     
     // Track all maturity options for each underlying
     mapping(address => uint256[]) public availableMaturities;
-    mapping(address => mapping(uint256 => bool)) public maturityExists;
+    // mapping(address => mapping(uint256 => bool)) public maturityExists;
     
     // Keep existing mappings for backward compatibility
     mapping(address => TokenPair) public syTokenPairs; // SY token => PT/YT pair
@@ -131,7 +163,7 @@ contract SYFactory is Ownable, ReentrancyGuard {
         if (underlying == address(0)) revert InvalidUnderlyingToken();
         if (maturity <= block.timestamp + MIN_MATURITY_DURATION) revert MaturityTooSoon();
         if (maturity > block.timestamp + MAX_MATURITY_DURATION) revert MaturityTooFar();
-        if (maturityExists[underlying][maturity]) revert MaturityAlreadyExists();
+        if (underlyingToSYByMaturity[underlying][maturity] != address(0)) revert MaturityAlreadyExists();
         if (msg.value < maturityCreationFee) revert InsufficientFee();
         
         // Create SY token
@@ -162,7 +194,7 @@ contract SYFactory is Ownable, ReentrancyGuard {
         // Update mappings
         underlyingToSYByMaturity[underlying][maturity] = address(syToken);
         availableMaturities[underlying].push(maturity);
-        maturityExists[underlying][maturity] = true;
+        // maturityExists[underlying][maturity] = true;
         allSYTokens.push(address(syToken));
         
         // Add underlying token to list if it's the first time
@@ -203,7 +235,7 @@ contract SYFactory is Ownable, ReentrancyGuard {
      * @dev Check if a maturity option exists for an underlying
      */
     function hasMaturityOption(address underlying, uint256 maturity) external view returns (bool) {
-        return maturityExists[underlying][maturity];
+        return underlyingToSYByMaturity[underlying][maturity] != address(0);
     }
     
     /**
@@ -215,6 +247,30 @@ contract SYFactory is Ownable, ReentrancyGuard {
     
     /**
      * @dev Wrap underlying tokens into SY tokens with specific maturity
+     * 
+     * This function creates SY tokens without splitting them into PT + YT.
+     * SY tokens are yield-bearing and represent the full value (principal + yield).
+     * 
+     * USE CASES FOR wrapWithMaturity() (SY tokens only):
+     * - Yield Farming: SY tokens automatically earn yield without complexity
+     * - Simpler Strategy: Single token exposure instead of managing PT + YT separately
+     * - Lower Gas: No additional split transaction required
+     * - Liquidity Provision: Use SY tokens in AMM pools or lending protocols
+     * - Hold and Earn: Set-and-forget yield earning strategy
+     * - Collateral: Use SY tokens as collateral in other DeFi protocols
+     * - Future Flexibility: Keep SY tokens to split later when market conditions change
+     * 
+     * BENEFITS OF SY TOKENS:
+     * - Automatic yield accrual (no claiming required)
+     * - Single token to manage
+     * - Can be split later using split() function
+     * - Full exposure to underlying asset performance
+     * - Composable with other DeFi protocols
+     * 
+     * @param underlying The underlying token address to wrap
+     * @param amount The amount of underlying tokens to wrap
+     * @param maturity The maturity timestamp for the SY token
+     * @return syTokenAddress The address of the created SY token
      */
     function wrapWithMaturity(
         address underlying, 
@@ -235,38 +291,28 @@ contract SYFactory is Ownable, ReentrancyGuard {
         
         return syTokenAddress;
     }
-    
+
     /**
-     * @dev Backward compatibility: wrap with default/first available maturity
+     * @dev Split SY tokens into PT and YT tokens
+     * 
+     * USE CASES FOR split() (separate from wrapAndSplit):
+     * - Users who already hold SY tokens and want to split them later
+     * - Users who received SY tokens from other sources (transfers, rewards, etc.)
+     * - Timing strategies: wrap first, split when market conditions are favorable
+     * - Partial splitting: split only a portion of held SY tokens
      */
-    function wrap(address underlying, uint256 amount) external nonReentrant returns (address) {
-        uint256[] memory maturities = availableMaturities[underlying];
-        if (maturities.length == 0) revert NoMaturityOptionsAvailable();
-        
-        // Use the first available maturity that hasn't expired
-        uint256 selectedMaturity = 0;
-        for (uint256 i = 0; i < maturities.length; i++) {
-            if (maturities[i] > block.timestamp) {
-                selectedMaturity = maturities[i];
-                break;
-            }
-        }
-        if (selectedMaturity == 0) revert NoValidMaturityOptionsAvailable();
-        
-        // Direct internal call to avoid external call overhead
-        address syTokenAddress = underlyingToSYByMaturity[underlying][selectedMaturity];
-        SYToken syToken = SYToken(syTokenAddress);
-        syToken.wrapFrom(msg.sender, amount);
-        
-        emit TokensWrapped(msg.sender, underlying, syTokenAddress, amount, selectedMaturity);
-        
-        return syTokenAddress;
+    function split(address syTokenAddress, uint256 amount) public nonReentrant returns (address, address) {
+        return _split(syTokenAddress, amount, msg.sender, msg.sender);
     }
     
     /**
-     * @dev Split SY tokens into PT and YT tokens
+     * @dev Internal split function that can handle different token holders and recipients
+     * @param syTokenAddress Address of the SY token to split
+     * @param amount Amount of SY tokens to split
+     * @param tokenHolder Address that currently holds the SY tokens
+     * @param recipient Address that will receive the PT and YT tokens
      */
-    function split(address syTokenAddress, uint256 amount) external nonReentrant returns (address, address) {
+    function _split(address syTokenAddress, uint256 amount, address tokenHolder, address recipient) internal returns (address, address) {
         TokenPair memory pair = syTokenPairs[syTokenAddress];
         if (!pair.exists) revert TokenPairDoesNotExist();
         
@@ -275,19 +321,102 @@ contract SYFactory is Ownable, ReentrancyGuard {
         YTToken ytToken = YTToken(pair.yt);
         
         if (syToken.hasMatured()) revert SYTokenHasMatured();
-        if (syToken.balanceOf(msg.sender) < amount) revert InsufficientSYBalance();
         
-        // Burn SY tokens
-        syToken.transferFrom(msg.sender, address(this), amount);
+        // Debug: Check balance before split
+        uint256 currentBalance = syToken.balanceOf(tokenHolder);
+        // console.log("_split: tokenHolder address: %s, currentBalance %d", tokenHolder, currentBalance);
+        // console.log("_split: required amount: %d", amount);
         
-        // Mint PT and YT tokens
-        ptToken.mint(msg.sender, amount);
-        ytToken.mint(msg.sender, amount);
+        if (currentBalance < amount) {
+            // console.log("_split: ERROR!");
+            revert InsufficientSYBalance(); // Debug: This will show if error is from _split
+        }
         
-        emit TokensSplit(msg.sender, syTokenAddress, amount, pair.pt, pair.yt);
+        // if (syToken.balanceOf(tokenHolder) < amount) revert InsufficientSYBalance();
+        
+        // Burn SY tokens from token holder
+        if (tokenHolder == address(this)) {
+            // If factory holds the tokens, use burnFrom
+            syToken.burnFrom(address(this), amount);
+        } else {
+            // If user holds the tokens, transfer to factory (effectively burning)
+            syToken.transferFrom(tokenHolder, address(this), amount);
+        }
+        
+        // Mint PT and YT tokens to recipient
+        ptToken.mint(recipient, amount);
+        ytToken.mint(recipient, amount);
+        
+        emit TokensSplit(recipient, syTokenAddress, amount, pair.pt, pair.yt);
         
         return (pair.pt, pair.yt);
     }
+    
+    
+    
+    
+    /**
+     * @dev Wrap underlying tokens and immediately split into PT + YT tokens
+     * 
+     * This is a convenience function that combines wrapWithMaturity() + split() into a single transaction.
+     * It's the most common user flow for yield tokenization strategies.
+     * 
+     * USE CASES FOR wrapAndSplit():
+     * - Yield Trading: Sell YT tokens for upfront yield, keep PT for principal protection
+     * - Separate Strategies: Trade PT and YT tokens independently on secondary markets
+     * - Arbitrage: Take advantage of pricing differences between PT/YT vs SY tokens
+     * - Portfolio Diversification: Hold different risk profiles (PT = principal, YT = yield)
+     * - Gas Efficiency: Single transaction instead of wrap() + split()
+     * 
+     * BENEFITS:
+     * - Single transaction (lower gas cost)
+     * - Single approval required
+     * - Atomic operation (all or nothing)
+     * - Better user experience
+     * 
+     * @param underlying The underlying token address to wrap
+     * @param amount The amount of underlying tokens to wrap and split
+     * @param maturity The maturity timestamp for the SY token
+     * @return syTokenAddress The SY token address (for reference)
+     * @return ptTokenAddress The PT token address
+     * @return ytTokenAddress The YT token address
+     */
+    function wrapAndSplit(
+        address underlying, 
+        uint256 amount, 
+        uint256 maturity
+    ) external nonReentrant returns (address, address, address) {
+        // Get SY token address for the specified maturity
+        address syTokenAddress = underlyingToSYByMaturity[underlying][maturity];
+        if (syTokenAddress == address(0)) revert SYTokenDoesNotExist();
+        
+        SYToken syToken = SYToken(syTokenAddress);
+        if (syToken.hasMatured()) revert SYTokenHasMatured();
+        
+        // Get PT/YT token pair for this SY token
+        TokenPair memory pair = syTokenPairs[syTokenAddress];
+        if (!pair.exists) revert TokenPairDoesNotExist();
+        
+        // Step 1: Transfer underlying tokens from user to factory
+        IERC20 underlyingToken = IERC20(underlying);
+        underlyingToken.transferFrom(msg.sender, address(this), amount);
+        // console.log("wrapAndSplit: Transferred underlying tokens from user to factory");
+        
+        // Step 2: Mint SY tokens to factory (temporary accounting)
+        syToken.mintTo(address(this), amount);
+        // console.log("wrapAndSplit: Minted SY tokens to factory, amount:", amount);
+        // console.log("wrapAndSplit: Factory SY balance after mint:", syToken.balanceOf(address(this)));
+        
+        // Step 3: Use internal split function (factory holds SY, user gets PT+YT)
+        // console.log("wrapAndSplit: About to call _split");
+        _split(syTokenAddress, amount, address(this), msg.sender);
+        
+        // Emit wrap event (split event emitted by _split)
+        emit TokensWrapped(msg.sender, underlying, syTokenAddress, amount, maturity);
+        
+        return (syTokenAddress, pair.pt, pair.yt);
+    }
+    
     
     /**
      * @dev Merge PT and YT tokens back into SY tokens

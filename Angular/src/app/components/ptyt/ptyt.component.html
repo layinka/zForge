@@ -1,3 +1,61 @@
+<!-- Staking Success Celebration -->
+@if (stakingResult() && stakingResult()!.showCelebration) {
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="alert alert-success border-0 shadow-sm celebration-alert">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center mb-3">
+              <div class="celebration-icon me-3">
+                <i class="bi bi-check-circle-fill text-success"></i>
+              </div>
+              <div>
+                <h4 class="alert-heading mb-1">
+                  <i class="bi bi-party-popper me-2"></i>
+                  Staking Successful! 🎉
+                </h4>
+                <p class="mb-0 text-muted">Your tokens have been successfully staked</p>
+              </div>
+            </div>
+            
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="staking-detail">
+                  <small class="text-muted d-block">Token Staked</small>
+                  <strong>{{ stakingResult()!.underlyingTokenInfo?.symbol }}</strong>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="staking-detail">
+                  <small class="text-muted d-block">Maturity Date</small>
+                  <strong>{{ formatMaturityDate(stakingResult()!.maturity) }}</strong>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="staking-detail">
+                  <small class="text-muted d-block">Expected APY</small>
+                  <strong class="text-success">
+                    {{ stakingResult()!.syTokenInfo ? calculateAPY(stakingResult()!.syTokenInfo!.yieldRate).toFixed(2) : '0' }}%
+                  </strong>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-3">
+              <small class="text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                You will receive PT and YT tokens representing your staked position. Check your balances below.
+              </small>
+            </div>
+          </div>
+          
+          <button type="button" class="btn-close" (click)="dismissStakingResult()"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
 <div class="row">
   <div class="col-12">
     <div class="text-center mb-5">
@@ -26,7 +84,7 @@
             <i class="bi bi-shield-check me-2"></i>
             Principal Tokens (PT)
           </h5>
-          @if (tokenService.ptTokens().length > 0) {
+          @if (filteredPTTokens().length > 0) {
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
@@ -39,7 +97,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (ptToken of tokenService.ptTokens(); track ptToken.address) {
+                  @for (ptToken of filteredPTTokens(); track ptToken.address) {
                     <tr>
                       <td>
                         <div class="d-flex align-items-center">
@@ -47,7 +105,7 @@
                           {{ ptToken.name }}
                         </div>
                       </td>
-                      <td>{{ blockchainService.formatBalance(ptToken.balance) }}</td>
+                      <td>{{ parseFloat(ptToken.balance || '0') | number:'1.0-4' }}</td>
                       <td>{{ getPTMaturity(ptToken.address) }}</td>
                       <td>
                         @if (isPTMatured(ptToken.address)) {
@@ -76,7 +134,13 @@
           } @else {
             <div class="text-center py-4">
               <i class="bi bi-inbox display-1 text-muted"></i>
-              <p class="text-muted mt-2">No PT tokens found</p>
+              <p class="text-muted mt-2">
+                @if (selectedSYToken()) {
+                  No PT tokens found for selected SY token
+                } @else {
+                  No PT tokens with balance found. Stake tokens to generate PT tokens.
+                }
+              </p>
             </div>
           }
         </div>
@@ -87,7 +151,7 @@
             <i class="bi bi-graph-up me-2"></i>
             Yield Tokens (YT)
           </h5>
-          @if (tokenService.ytTokens().length > 0) {
+          @if (filteredYTTokens().length > 0) {
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
@@ -101,7 +165,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (ytToken of tokenService.ytTokens(); track ytToken.address) {
+                  @for (ytToken of filteredYTTokens(); track ytToken.address) {
                     <tr>
                       <td>
                         <div class="d-flex align-items-center">
@@ -109,7 +173,7 @@
                           {{ ytToken.name }}
                         </div>
                       </td>
-                      <td>{{ blockchainService.formatBalance(ytToken.balance) }}</td>
+                      <td>{{ parseFloat(ytToken.balance || '0') | number:'1.0-4' }}</td>
                       <td>
                         <span class="text-success fw-semibold">
                           {{ getYTClaimableYield(ytToken.address) }}
@@ -143,7 +207,13 @@
           } @else {
             <div class="text-center py-4">
               <i class="bi bi-inbox display-1 text-muted"></i>
-              <p class="text-muted mt-2">No YT tokens found</p>
+              <p class="text-muted mt-2">
+                @if (selectedSYToken()) {
+                  No YT tokens found for selected SY token
+                } @else {
+                  No YT tokens with balance found. Stake tokens to generate YT tokens.
+                }
+              </p>
             </div>
           }
         </div>
@@ -153,6 +223,41 @@
 
   <!-- Actions Panel -->
   <div class="col-lg-4">
+    <!-- Filter by SY Token -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="bi bi-funnel me-2"></i>
+          Filter by SY Token
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Select SY Token to Filter</label>
+          <select 
+            class="form-select" 
+            [ngModel]="selectedSYToken()?.address || ''"
+            (ngModelChange)="onSYTokenFilterChange($event)">
+            <option value="">Show All PT/YT Tokens</option>
+            @for (syToken of tokenService.syTokens(); track syToken.address) {
+              <option [value]="syToken.address">
+                {{ syToken.name }} ({{ parseFloat(syToken.balance || '0') | number:'1.0-4' }})
+              </option>
+            }
+          </select>
+        </div>
+        @if (selectedSYToken()) {
+          <div class="alert alert-info">
+            <small>
+              <strong>Filtering:</strong> Showing PT/YT tokens for {{ selectedSYToken()!.name }}
+              <br>
+              <strong>Maturity:</strong> {{ formatMaturity(selectedSYToken()!.maturity) }}
+            </small>
+          </div>
+        }
+      </div>
+    </div>
+    
     <!-- Merge PT + YT -->
     <div class="card mb-4">
       <div class="card-header">
@@ -171,10 +276,10 @@
               name="selectedSYForMerge"
               required>
               <option value="">Choose SY token...</option>
-              @for (syToken of tokenService.syTokens(); track syToken.address) {
+              @for (syToken of availableSYTokensForMerge(); track syToken.address) {
                 @if (canMerge(syToken.address)) {
                   <option [value]="syToken.address">
-                    {{ syToken.name }}
+                    {{ syToken.name }} ({{ parseFloat(syToken.balance || '0') | number:'1.0-4' }})
                   </option>
                 }
               }

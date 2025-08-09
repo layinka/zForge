@@ -31,19 +31,19 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
     {
       name: "Staked CORE",
       symbol: "stCORE",
-      yieldRatePerBlock: 80,// should be divided by 1e8 // Math.floor(0.000008 * 1e18), // ~80% APY
+      yieldRatePerBlock: 30,// should be divided by 1e8 // Math.floor(0.000008 * 1e18), // ~80% APY
       address:''
     },
     {
       name: "Staked BTC",
       symbol: "stBTC",
-      yieldRatePerBlock: 50,// Math.floor(0.000005 * 1e18), // ~50% APY
+      yieldRatePerBlock: 20,// Math.floor(0.000005 * 1e18), // ~50% APY
       address:''
     },
     {
       name: "Dual Staked CORE and BTC",
       symbol: "dualStake",
-      yieldRatePerBlock: 120, // Math.floor(0.000012 * 1e18), // ~120% APY
+      yieldRatePerBlock: 12, // Math.floor(0.000012 * 1e18), // ~120% APY
       address:''
     },
   ]

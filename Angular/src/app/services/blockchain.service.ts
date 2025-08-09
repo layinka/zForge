@@ -1,5 +1,5 @@
 import { computed, effect, Injectable, signal } from '@angular/core';
-import { readContract, writeContract, multicall } from '@wagmi/core';
+import { readContract, writeContract, multicall, waitForTransactionReceipt, simulateContract } from '@wagmi/core';
 import { formatEther, parseEther, formatUnits } from 'viem';
 import { environment, ChainContracts } from '../../environments/environment';
 import { Web3Service, getMultiCallAddress, wagmiAdapter } from './web3';
@@ -230,22 +230,23 @@ export class BlockchainService {
     console.log(spenderAddress as `0x${string}`);
     console.log( parseEther(amount.toString()));
    console.log(tokenAddress, spenderAddress, amount, [spenderAddress as `0x${string}`, parseEther(amount)]);
-    await writeContract(wagmiAdapter.wagmiConfig, {
+    let hash = await writeContract(wagmiAdapter.wagmiConfig, {
       address: tokenAddress as `0x${string}`,
       abi: ERC20_ABI,
       functionName: 'approve',
       args: [spenderAddress as `0x${string}`, parseEther(amount)]
     });
+    await waitForTransactionReceipt(wagmiAdapter.wagmiConfig, { hash });
   }
 
-  async wrapToken(underlyingAddress: string, amount: string) {
-    await writeContract(wagmiAdapter.wagmiConfig, {
-      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
-      abi: SY_FACTORY_ABI,
-      functionName: 'wrap',
-      args: [underlyingAddress as `0x${string}`, parseEther(amount)]
-    });
-  }
+  // async wrapToken(underlyingAddress: string, amount: string) {
+  //   await writeContract(wagmiAdapter.wagmiConfig, {
+  //     address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+  //     abi: SY_FACTORY_ABI,
+  //     functionName: 'wrap',
+  //     args: [underlyingAddress as `0x${string}`, parseEther(amount)]
+  //   });
+  // }
 
   async splitSYToken(syTokenAddress: string, amount: string): Promise<void> {
     await writeContract(wagmiAdapter.wagmiConfig, {
@@ -307,6 +308,103 @@ export class BlockchainService {
       functionName: 'getAvailableMaturities' as any,
       args: [underlyingToken as `0x${string}`]
     }) as unknown as bigint[];
+  }
+
+  async getAllowance(tokenAddress: string, spenderAddress: string, userAddress?: string): Promise<string> {
+    const address = userAddress || this.currentAddress;
+    if (!address) {
+      throw new Error('No wallet connected');
+    }
+
+    const allowance = await readContract(wagmiAdapter.wagmiConfig, {
+      address: tokenAddress as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [address as `0x${string}`, spenderAddress as `0x${string}`]
+    }) as bigint;
+
+    const tokenInfo = await this.getTokenInfo(tokenAddress);
+    return formatUnits(allowance, tokenInfo.decimals);
+  }
+
+  async wrapWithMaturity(underlyingAddress: string, amount: string, maturity: bigint): Promise<void> {
+    await writeContract(wagmiAdapter.wagmiConfig, {
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+      abi: SY_FACTORY_ABI,
+      functionName: 'wrapWithMaturity',
+      args: [
+        underlyingAddress as `0x${string}`,
+        parseEther(amount),
+        maturity
+      ]
+    });
+  }
+
+  async wrapAndSplit(underlyingAddress: string, amount: string, maturity: bigint): Promise<{ syToken: string, ptToken: string, ytToken: string }> {
+    try {
+      const hash = await writeContract(wagmiAdapter.wagmiConfig, {
+        address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+        abi: SY_FACTORY_ABI,
+        functionName: 'wrapAndSplit',
+        args: [
+          underlyingAddress as `0x${string}`,
+          parseEther(amount),
+          maturity
+        ]
+      });
+      
+      await waitForTransactionReceipt(wagmiAdapter.wagmiConfig, { hash });
+      // The function returns (syTokenAddress, ptTokenAddress, ytTokenAddress)
+      // For now, we'll return the addresses by querying the contract
+      const syTokenAddress = await this.getSYTokenByMaturity(underlyingAddress, maturity);
+      const tokenPair = await this.getTokenPairByStToken(syTokenAddress);
+      
+      return {
+        syToken: syTokenAddress,
+        ptToken: tokenPair.pt,
+        ytToken: tokenPair.yt
+      };
+    } catch (error: any) {
+      // Enhanced error handling to capture raw error data
+      console.log('🔍 Raw wagmi error in wrapAndSplit:', error);
+      
+      // Try to extract raw error data from the RPC response
+      if (error?.cause?.cause?.data) {
+        console.log('📍 Found raw error data in cause.cause.data:', error.cause.cause.data);
+        // Create a new error with the raw data for the ErrorDecoder
+        const enhancedError = {
+          ...error,
+          rawErrorData: error.cause.cause.data
+        };
+        throw enhancedError;
+      }
+      
+      // If no raw data found, throw the original error
+      throw error;
+    }
+  }
+
+  async getSYTokenByMaturity(underlyingAddress: string, maturity: bigint): Promise<string> {
+    return await readContract(wagmiAdapter.wagmiConfig, {
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+      abi: SY_FACTORY_ABI,
+      functionName: 'getSYTokenByMaturity',
+      args: [underlyingAddress as `0x${string}`, maturity]
+    }) as string;
+  }
+
+  async getTokenPairByStToken(syTokenAddress: string): Promise<{ pt: string, yt: string }> {
+    const result = await readContract(wagmiAdapter.wagmiConfig, {
+      address: this.getCurrentChainContracts().syFactory as `0x${string}`,
+      abi: SY_FACTORY_ABI,
+      functionName: 'getTokenPairByStToken',
+      args: [syTokenAddress as `0x${string}`]
+    }) as [string, string];
+    
+    return {
+      pt: result[0],
+      yt: result[1]
+    };
   }
 
   // Utility methods

@@ -1,0 +1,193 @@
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+      <!-- Header -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body text-center">
+          <button class="btn btn-outline-secondary btn-sm float-start" (click)="goBack()">
+            <i class="bi bi-arrow-left me-2"></i>Back
+          </button>
+          
+          @if (underlyingToken()) {
+            <div class="mt-3">
+              <h2 class="mb-2">Stake {{ underlyingToken()!.symbol }}</h2>
+              <p class="text-muted mb-0">{{ underlyingToken()!.name }}</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      @if (isLoading()) {
+        <div class="card border-0 shadow-sm">
+          <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted">Loading token data...</p>
+          </div>
+        </div>
+      }
+
+      <!-- Step 1: Select Maturity -->
+      @if (!isLoading() && currentStep() === 1) {
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent border-bottom-0">
+            <div class="d-flex align-items-center">
+              <div class="step-indicator me-3">
+                <span class="badge bg-primary rounded-circle px-2 py-1">Step 1</span>
+              </div>
+              <h5 class="mb-0">Select Maturity</h5>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="text-muted mb-4">Choose your preferred maturity period to optimize your yield strategy.</p>
+            
+            @if (maturityOptions().length === 0) {
+              <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                No maturity options available for this token.
+              </div>
+            } @else {
+              <div class="row g-3">
+                @for (option of maturityOptions(); track option.maturity) {
+                  <div class="col-12">
+                    <button 
+                      class="btn btn-outline-primary w-100 maturity-option"
+                      [class.active]="selectedMaturity()?.maturity === option.maturity"
+                      (click)="selectMaturity(option)">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-start">
+                          <div class="fw-semibold">
+                            {{ formatMaturityDate(option.maturityDate) }}
+                            <span class="text-muted ms-2">({{ option.daysToMaturity }}d)</span>
+                          </div>
+                          <div class="text-success">
+                            {{ option.apy.toFixed(2)| number}}% APY
+                          </div>
+                        </div>
+                        <i class="bi bi-chevron-right"></i>
+                      </div>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Step 2: Deposit Amount -->
+      @if (!isLoading() && currentStep() === 2 && selectedMaturity()) {
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent border-bottom-0">
+            <div class="d-flex align-items-center">
+              <div class="step-indicator me-3">
+                <span class="badge bg-primary rounded-circle px-2 py-1">Step 2</span>
+              </div>
+              <h5 class="mb-0">Deposit Amount</h5>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Selected Maturity Summary -->
+            <div class="alert alert-info mb-4">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <strong>Selected Maturity:</strong> {{ formatMaturityDate(selectedMaturity()!.maturityDate) }}
+                  <span class="text-muted ms-2">({{ selectedMaturity()!.daysToMaturity }}d)</span>
+                </div>
+                <div class="text-success fw-semibold">
+                  {{ selectedMaturity()!.apy.toFixed(2)| number }}% APY
+                </div>
+              </div>
+            </div>
+
+            <!-- Wallet Connection Check -->
+            @if (!isWalletConnected()) {
+              <div class="alert alert-warning">
+                <i class="bi bi-wallet2 me-2"></i>
+                Please connect your wallet to continue.
+              </div>
+            } @else {
+              <!-- Balance Display -->
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <label class="form-label mb-0">Amount to Deposit</label>
+                  <small class="text-muted">
+                    Balance: {{ userBalance()| number }} {{ underlyingToken()!.symbol }}
+                  </small>
+                </div>
+              </div>
+
+              <!-- Amount Input -->
+              <div class="input-group mb-3">
+                <input 
+                  type="number" 
+                  class="form-control form-control-lg"
+                  [class.is-invalid]="hasInsufficientBalance()"
+                  placeholder="0.0"
+                  [(ngModel)]="depositAmount"
+                  step="0.000001"
+                  min="0">
+                <button 
+                  class="btn btn-outline-secondary" 
+                  type="button"
+                  (click)="setMaxAmount()">
+                  MAX
+                </button>
+                <span class="input-group-text">{{ underlyingToken()!.symbol }}</span>
+              </div>
+
+              <!-- Error Messages -->
+              @if (hasInsufficientBalance()) {
+                <div class="alert alert-danger">
+                  <i class="bi bi-exclamation-triangle me-2"></i>
+                  Insufficient balance. You need more {{ underlyingToken()!.symbol }} tokens.
+                </div>
+              }
+
+              <!-- Action Buttons -->
+              <div class="d-grid gap-2">
+                @if (needsApproval() && !hasInsufficientBalance() && depositAmount()) {
+                  <button 
+                    class="btn btn-warning btn-lg"
+                    [disabled]="isLoading()"
+                    (click)="approveFactoryToken()">
+                    @if (isLoading()) {
+                      <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    <i class="bi bi-check-circle me-2"></i>
+                    Approve {{ underlyingToken()!.symbol }}
+                  </button>
+                } @else {
+                  <button 
+                    class="btn btn-primary btn-lg"
+                    [disabled]="!canProceed() || isLoading()"
+                    (click)="depositToken()">
+                    @if (isLoading()) {
+                      <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Stake {{ depositAmount() || '0' | number }} {{ underlyingToken()!.symbol }}
+                  </button>
+                }
+              </div>
+
+              <!-- Info Box -->
+              <div class="alert alert-light mt-4">
+                <h6 class="alert-heading">
+                  <i class="bi bi-info-circle me-2"></i>What happens next?
+                </h6>
+                <p class="mb-2">After staking, you'll receive:</p>
+                <ul class="mb-0">
+                  <li><strong>PT Tokens:</strong> Principal tokens representing your initial deposit</li>
+                  <li><strong>YT Tokens:</strong> Yield tokens that earn rewards over time</li>
+                </ul>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

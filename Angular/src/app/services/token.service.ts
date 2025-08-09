@@ -11,6 +11,17 @@ export interface AvailableToken {
   apy?: number;
 }
 
+export interface AggregatedSYToken {
+  underlyingAddress: string;
+  underlyingSymbol: string;
+  underlyingName: string;
+  totalBalance: number;
+  tokenCount: number;
+  maturities: string[];
+  hasMaturedTokens: boolean;
+  hasActiveTokens: boolean;
+}
+
 // Multichain token storage interfaces
 export interface ChainTokenData {
   tokenBalances: Record<string, string>;
@@ -31,6 +42,44 @@ export class TokenService {
   public syTokens = signal<SYTokenInfo[]>([]);
   public ptTokens = signal<TokenInfo[]>([]);
   public ytTokens = signal<TokenInfo[]>([]);
+  public availableTokensCache = signal<AvailableToken[]>([]);
+  
+  // Computed signal for aggregated SY tokens by underlying
+  public aggregatedSYTokens = computed<AggregatedSYToken[]>(() => {
+    const syTokens = this.syTokens();
+    const aggregationMap = new Map<string, AggregatedSYToken>();
+    
+    for (const syToken of syTokens) {
+      const key = syToken.underlying.toLowerCase();
+      
+      if (aggregationMap.has(key)) {
+        const existing = aggregationMap.get(key)!;
+        existing.totalBalance += parseFloat(syToken.balance || '0');
+        existing.tokenCount += 1;
+        existing.maturities.push(this.formatMaturity(syToken.maturity));
+        existing.hasMaturedTokens = existing.hasMaturedTokens || syToken.hasMatured;
+        existing.hasActiveTokens = existing.hasActiveTokens || !syToken.hasMatured;
+      } else {
+        // Get underlying token info from available tokens cache
+        const underlyingToken = this.availableTokensCache().find(t => 
+          t.address.toLowerCase() === syToken.underlying.toLowerCase()
+        );
+        
+        aggregationMap.set(key, {
+          underlyingAddress: syToken.underlying,
+          underlyingSymbol: underlyingToken?.symbol || 'Unknown',
+          underlyingName: underlyingToken?.name || 'Unknown Token',
+          totalBalance: parseFloat(syToken.balance || '0'),
+          tokenCount: 1,
+          maturities: [this.formatMaturity(syToken.maturity)],
+          hasMaturedTokens: syToken.hasMatured,
+          hasActiveTokens: !syToken.hasMatured
+        });
+      }
+    }
+    
+    return Array.from(aggregationMap.values()).filter(token => token.totalBalance > 0);
+  });
 
   constructor(
     private blockchainService: BlockchainService,
@@ -65,28 +114,40 @@ export class TokenService {
     });
   }
   
-  // Get available tokens for current chain (computed signal)
-  availableTokens = computed(() => {
-    const chainId = this.web3Service.chainId || 31337;
-    const contracts = environment.contracts[chainId];
-    if (!contracts) {
+  // Get available tokens for current chain (async version that caches results)
+  async getAvailableTokens(): Promise<AvailableToken[]> {
+    try {
+      const underlyingTokenAddresses = await this.blockchainService.getAllUnderlyingTokens();
+      const availableTokens: AvailableToken[] = [];
+      
+      for (const tokenAddress of underlyingTokenAddresses) {
+        try {
+          const tokenInfo = await this.blockchainService.getTokenInfo(tokenAddress);
+          availableTokens.push({
+            address: tokenAddress,
+            name: tokenInfo.name,
+            symbol: tokenInfo.symbol,
+            isYieldBearing: true, // All tokens in the system are yield bearing
+            apy: 0 // Will be calculated dynamically when needed
+          });
+        } catch (error) {
+          console.warn(`Failed to load token info for ${tokenAddress}:`, error);
+        }
+      }
+      
+      // Cache the results for synchronous access
+      this.availableTokensCache.set(availableTokens);
+      
+      return availableTokens;
+    } catch (error) {
+      console.error('Error getting available tokens:', error);
       return [];
     }
-    return [
-      {
-        address: contracts.mockStCORE,
-        name: 'Staked CORE',
-        symbol: 'stCORE',
-        isYieldBearing: true,
-        apy: 5.0
-      }
-      // Add more tokens per chain as needed
-    ];
-  });
-
-  // Backward compatibility method
-  getAvailableTokens(): AvailableToken[] {
-    return this.availableTokens();
+  }
+  
+  // Get cached available tokens (synchronous)
+  getAvailableTokensSync(): AvailableToken[] {
+    return this.availableTokensCache();
   }
   
   // Update current chain reactive signals from stored data
@@ -178,6 +239,9 @@ export class TokenService {
     const chainId = this.web3Service.chainId || 31337;
     
     try {
+      // Load available tokens cache first
+      await this.getAvailableTokens();
+      
       await Promise.all([
         this.refreshUserTokens(chainId),
         this.refreshSYTokens(chainId),
@@ -191,15 +255,15 @@ export class TokenService {
   private async refreshUserTokens(chainId: number): Promise<void> {
     try {
       const tokenBalances: Record<string, string> = {};
-      const availableTokens = this.getAvailableTokens();
+      const underlyingTokenAddresses = await this.blockchainService.getAllUnderlyingTokens();
       
-      for (const token of availableTokens) {
+      for (const tokenAddress of underlyingTokenAddresses) {
         try {
-          const balance = await this.blockchainService.getTokenBalance(token.address);
-          tokenBalances[token.address] = balance;
+          const balance = await this.blockchainService.getTokenBalance(tokenAddress);
+          tokenBalances[tokenAddress] = balance;
         } catch (error) {
-          console.error(`Error fetching balance for ${token.symbol}:`, error);
-          tokenBalances[token.address] = '0';
+          console.error(`Error fetching balance for ${tokenAddress}:`, error);
+          tokenBalances[tokenAddress] = '0';
         }
       }
       
@@ -212,7 +276,19 @@ export class TokenService {
   private async refreshSYTokens(chainId: number): Promise<void> {
     try {
       const syTokens: SYTokenInfo[] = [];
-      // Add logic to fetch SY tokens from blockchain
+      
+      // Get all SY token addresses from the factory
+      const allSYTokenAddresses = await this.blockchainService.getAllSYTokens();
+      
+      for (const syTokenAddress of allSYTokenAddresses) {
+        try {
+          const syTokenInfo = await this.blockchainService.getSYTokenInfo(syTokenAddress);
+          syTokens.push(syTokenInfo);
+        } catch (error) {
+          console.warn(`Failed to load SY token info for ${syTokenAddress}:`, error);
+        }
+      }
+      
       this.setChainData(chainId, { syTokens });
     } catch (error) {
       console.error('Error refreshing SY tokens:', error);
@@ -223,7 +299,36 @@ export class TokenService {
     try {
       const ptTokens: TokenInfo[] = [];
       const ytTokens: TokenInfo[] = [];
-      // Add logic to fetch PT/YT tokens from blockchain
+      
+      // Get all SY token addresses first
+      const allSYTokenAddresses = await this.blockchainService.getAllSYTokens();
+      
+      for (const syTokenAddress of allSYTokenAddresses) {
+        try {
+          const syTokenInfo = await this.blockchainService.getSYTokenInfo(syTokenAddress);
+          
+          // Get PT token info
+          if (syTokenInfo.ptAddress && syTokenInfo.ptAddress !== '0x0000000000000000000000000000000000000000') {
+            const ptTokenInfo = await this.blockchainService.getTokenInfo(syTokenInfo.ptAddress);
+            ptTokens.push({
+              ...ptTokenInfo,
+              address: syTokenInfo.ptAddress
+            });
+          }
+          
+          // Get YT token info
+          if (syTokenInfo.ytAddress && syTokenInfo.ytAddress !== '0x0000000000000000000000000000000000000000') {
+            const ytTokenInfo = await this.blockchainService.getTokenInfo(syTokenInfo.ytAddress);
+            ytTokens.push({
+              ...ytTokenInfo,
+              address: syTokenInfo.ytAddress
+            });
+          }
+        } catch (error) {
+          console.warn(`Failed to load PT/YT token info for SY token ${syTokenAddress}:`, error);
+        }
+      }
+      
       this.setChainData(chainId, { ptTokens, ytTokens });
     } catch (error) {
       console.error('Error refreshing PT/YT tokens:', error);
@@ -235,18 +340,19 @@ export class TokenService {
     this.syTokens.set([]);
     this.ptTokens.set([]);
     this.ytTokens.set([]);
+    this.availableTokensCache.set([]);
   }
 
   // Helper methods
   getTokenByAddress(address: string): AvailableToken | undefined {
-    return this.getAvailableTokens().find((token: AvailableToken) => 
+    return this.getAvailableTokensSync().find((token: AvailableToken) => 
       token.address.toLowerCase() === address.toLowerCase()
     );
   }
 
   getUserTokenBySymbol(symbol: string): TokenInfo | undefined {
     // Find the token in available tokens
-    const availableToken = this.getAvailableTokens().find(token => 
+    const availableToken = this.getAvailableTokensSync().find((token: AvailableToken) => 
       token.symbol.toLowerCase() === symbol.toLowerCase()
     );
     
@@ -296,10 +402,10 @@ export class TokenService {
     return syValue + ptValue + ytValue;
   }
 
-  // Get claimable yield across all YT tokens
+  // Get claimable yield across all SY tokens
   getTotalClaimableYield(): number {
-    return this.ytTokens().reduce((sum, token) => 
-      sum + parseFloat(token.balance || '0'), 0
+    return this.syTokens().reduce((sum, token) => 
+      sum + parseFloat(token.claimableYield || '0'), 0
     );
   }
 
@@ -362,8 +468,8 @@ export class TokenService {
   }
 
   // Update token addresses after deployment
-  updateTokenAddresses(addresses: { [key: string]: string }): void {
-    const availableTokens = this.getAvailableTokens();
+  async updateTokenAddresses(addresses: { [key: string]: string }): Promise<void> {
+    const availableTokens = await this.getAvailableTokens();
     
     availableTokens.forEach((token: AvailableToken) => {
       if (addresses[token.symbol]) {
