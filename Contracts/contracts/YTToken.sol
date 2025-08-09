@@ -11,6 +11,11 @@ import "./SYToken.sol";
  * @dev Yield Token representing the yield component of SY tokens
  */
 contract YTToken is ERC20, Ownable, ReentrancyGuard {
+    // Custom errors
+    error TokenHasExpired();
+    error InvalidSYTokenAddress();
+    error NoYieldToClaim();
+    
     SYToken public immutable syToken;
     uint256 public immutable maturity;
     
@@ -20,7 +25,7 @@ contract YTToken is ERC20, Ownable, ReentrancyGuard {
     event YieldClaimed(address indexed user, uint256 yieldAmount);
     
     modifier onlyBeforeMaturity() {
-        require(block.timestamp < maturity, "Token has expired");
+        if (block.timestamp >= maturity) revert TokenHasExpired();
         _;
     }
     
@@ -29,7 +34,7 @@ contract YTToken is ERC20, Ownable, ReentrancyGuard {
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) Ownable(msg.sender) {
-        require(_syToken != address(0), "Invalid SY token address");
+        if (_syToken == address(0)) revert InvalidSYTokenAddress();
         
         syToken = SYToken(_syToken);
         maturity = syToken.maturity();
@@ -73,7 +78,7 @@ contract YTToken is ERC20, Ownable, ReentrancyGuard {
      */
     function claimYield() external nonReentrant onlyBeforeMaturity {
         uint256 yieldAmount = getClaimableYield(msg.sender);
-        require(yieldAmount > 0, "No yield to claim");
+        if (yieldAmount == 0) revert NoYieldToClaim();
         
         lastClaimTime[msg.sender] = block.timestamp;
         totalYieldClaimed[msg.sender] += yieldAmount;

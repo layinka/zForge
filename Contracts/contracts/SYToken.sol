@@ -11,6 +11,15 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev Standardized Yield Token that wraps yield-bearing assets
  */
 contract SYToken is ERC20, Ownable, ReentrancyGuard {
+    // Custom errors
+    error InvalidUnderlyingToken();
+    error MaturityMustBeInFuture();
+    error AmountMustBeGreaterThanZero();
+    error TokenHasMatured();
+    error InsufficientSYBalance();
+    error NoYieldToClaim();
+    error OnlyFactoryCanCall();
+    error InsufficientBalance();
     IERC20 public immutable underlyingToken;
     uint256 public immutable maturity;
     uint256 public yieldRate; // Annual yield rate in basis points (e.g., 500 = 5%)
@@ -30,8 +39,8 @@ contract SYToken is ERC20, Ownable, ReentrancyGuard {
         string memory _symbol,
         uint256 _yieldRate
     ) ERC20(_name, _symbol) Ownable(msg.sender) {
-        require(_underlyingToken != address(0), "Invalid underlying token");
-        require(_maturity > block.timestamp, "Maturity must be in the future");
+        if (_underlyingToken == address(0)) revert InvalidUnderlyingToken();
+        if (_maturity <= block.timestamp) revert MaturityMustBeInFuture();
         
         underlyingToken = IERC20(_underlyingToken);
         maturity = _maturity;
@@ -43,27 +52,48 @@ contract SYToken is ERC20, Ownable, ReentrancyGuard {
      * @dev Wrap underlying tokens into SY tokens
      */
     function wrap(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be greater than 0");
-        require(block.timestamp < maturity, "Token has matured");
+        _wrapInternal(msg.sender, amount);
+    }
+    
+    /**
+     * @dev Wrap underlying tokens into SY tokens on behalf of a user (called by SYFactory)
+     * @param from The user address to wrap tokens for
+     * @param amount Amount of underlying tokens to wrap
+     */
+    function wrapFrom(address from, uint256 amount) external nonReentrant {
+        // Only allow SYFactory to call this function
+        if (owner() != msg.sender) revert OnlyFactoryCanCall();
+        _wrapInternal(from, amount);
+    }
+    
+    /**
+     * @dev Internal wrap logic shared by wrap() and wrapFrom()
+     * @param user The user address to wrap tokens for
+     * @param amount Amount of underlying tokens to wrap
+     */
+    function _wrapInternal(address user, uint256 amount) internal {
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (block.timestamp >= maturity) revert TokenHasMatured();
         
-        underlyingToken.transferFrom(msg.sender, address(this), amount);
+        // Transfer underlying tokens from user to this contract
+        underlyingToken.transferFrom(user, address(this), amount);
         
         // Update yield before minting
         _updateYield();
         
-        // Mint SY tokens 1:1 with underlying
-        _mint(msg.sender, amount);
-        lastClaimTime[msg.sender] = block.timestamp;
+        // Mint SY tokens 1:1 with underlying to the user
+        _mint(user, amount);
+        lastClaimTime[user] = block.timestamp;
         
-        emit Wrap(msg.sender, amount, amount);
+        emit Wrap(user, amount, amount);
     }
     
     /**
      * @dev Unwrap SY tokens back to underlying tokens
      */
     function unwrap(uint256 amount) external nonReentrant {
-        require(amount > 0, "Amount must be greater than 0");
-        require(balanceOf(msg.sender) >= amount, "Insufficient SY balance");
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (balanceOf(msg.sender) < amount) revert InsufficientSYBalance();
         
         _updateYield();
         
@@ -95,10 +125,10 @@ contract SYToken is ERC20, Ownable, ReentrancyGuard {
      * @dev Claim accumulated yield
      */
     function claimYield() external nonReentrant {
-        require(block.timestamp < maturity, "Token has matured");
+        if (block.timestamp >= maturity) revert TokenHasMatured();
         
         uint256 yieldAmount = getClaimableYield(msg.sender);
-        require(yieldAmount > 0, "No yield to claim");
+        if (yieldAmount == 0) revert NoYieldToClaim();
         
         lastClaimTime[msg.sender] = block.timestamp;
         totalYieldAccrued += yieldAmount;
@@ -136,6 +166,25 @@ contract SYToken is ERC20, Ownable, ReentrancyGuard {
             return 0;
         }
         return maturity - block.timestamp;
+    }
+    
+    /**
+     * @dev Mint SY tokens to a specific address (only callable by SYFactory)
+     * @param to Address to mint tokens to
+     * @param amount Amount of tokens to mint
+     */
+    function mintTo(address to, uint256 amount) external {
+        // Only allow SYFactory to call this function
+        if (owner() != msg.sender) revert OnlyFactoryCanCall();
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (block.timestamp >= maturity) revert TokenHasMatured();
+        
+        _mint(to, amount);
+        
+        // Set lastClaimTime if this is the first time user receives tokens
+        if (lastClaimTime[to] == 0) {
+            lastClaimTime[to] = block.timestamp;
+        }
     }
     
     /**

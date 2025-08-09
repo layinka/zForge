@@ -9,26 +9,77 @@ import "./PTToken.sol";
 import "./YTToken.sol";
 
 /**
- * @title SYFactory
- * @dev Main factory contract for creating and managing SY, PT, and YT tokens
+ * @title SYFactory with User-Chosen Maturity
+ * @dev Enhanced factory contract allowing users to choose their own maturity periods
  */
 contract SYFactory is Ownable, ReentrancyGuard {
+    // Custom errors
+    error InvalidUnderlyingToken();
+    error MaturityTooSoon();
+    error MaturityTooFar();
+    error MaturityAlreadyExists();
+    error InsufficientFee();
+    error SYTokenDoesNotExist();
+    error SYTokenHasMatured();
+    error NoMaturityOptionsAvailable();
+    error NoValidMaturityOptionsAvailable();
+    error TokenPairDoesNotExist();
+    error InsufficientSYBalance();
+    error InsufficientPTBalance();
+    error InsufficientYTBalance();
+    error PTTokenHasNotMatured();
+    error NoPTTokensToRedeem();
+    error YTTokenHasExpired();
+    error NoYieldToClaim();
+    
     struct TokenPair {
         address pt;
         address yt;
         bool exists;
     }
     
-    mapping(address => TokenPair) public syTokenPairs; // SY token => PT/YT pair
-    mapping(address => address) public underlyingToSY; // underlying => SY token
+    struct MaturityOption {
+        uint256 maturity;
+        address syToken;
+        bool active;
+    }
     
+    // New mapping structure: underlying => maturity => SY token address
+    mapping(address => mapping(uint256 => address)) public underlyingToSYByMaturity;
+    
+    // Track all maturity options for each underlying
+    mapping(address => uint256[]) public availableMaturities;
+    mapping(address => mapping(uint256 => bool)) public maturityExists;
+    
+    // Keep existing mappings for backward compatibility
+    mapping(address => TokenPair) public syTokenPairs; // SY token => PT/YT pair
     address[] public allSYTokens;
+    
+    // Configuration
+    uint256 public constant MIN_MATURITY_DURATION = 1 days;
+    uint256 public constant MAX_MATURITY_DURATION = 100 * 365 days; // 100 years
+    uint256 public maturityCreationFee = 0; // Fee in wei to create new maturity option
     
     event SYTokenCreated(
         address indexed underlying,
         address indexed syToken,
         uint256 maturity,
-        uint256 yieldRate
+        uint256 yieldRate,
+        address indexed creator
+    );
+    
+    event MaturityOptionAdded(
+        address indexed underlying,
+        uint256 maturity,
+        address indexed syToken
+    );
+    
+    event TokensWrapped(
+        address indexed user,
+        address indexed underlying,
+        address indexed syToken,
+        uint256 amount,
+        uint256 maturity
     );
     
     event TokensSplit(
@@ -58,11 +109,16 @@ contract SYFactory is Ownable, ReentrancyGuard {
         address indexed ytToken,
         uint256 yieldAmount
     );
-    
+
     constructor() Ownable(msg.sender) {}
     
     /**
-     * @dev Create a new SY token for an underlying asset
+     * @dev Create a new SY token for an underlying asset with specific maturity
+     * @param underlying The underlying asset address
+     * @param maturity The maturity timestamp
+     * @param name Token name
+     * @param symbol Token symbol  
+     * @param yieldRate Annual yield rate in basis points
      */
     function createSYToken(
         address underlying,
@@ -70,17 +126,19 @@ contract SYFactory is Ownable, ReentrancyGuard {
         string memory name,
         string memory symbol,
         uint256 yieldRate
-    ) external onlyOwner returns (address) {
-        require(underlying != address(0), "Invalid underlying token");
-        require(maturity > block.timestamp, "Maturity must be in the future");
-        require(underlyingToSY[underlying] == address(0), "SY token already exists");
+    ) external payable nonReentrant returns (address) {
+        if (underlying == address(0)) revert InvalidUnderlyingToken();
+        if (maturity <= block.timestamp + MIN_MATURITY_DURATION) revert MaturityTooSoon();
+        if (maturity > block.timestamp + MAX_MATURITY_DURATION) revert MaturityTooFar();
+        if (maturityExists[underlying][maturity]) revert MaturityAlreadyExists();
+        if (msg.value < maturityCreationFee) revert InsufficientFee();
         
         // Create SY token
         SYToken syToken = new SYToken(
             underlying,
             maturity,
-            name,
-            symbol,
+            string(abi.encodePacked("Standardized Yield ", name)),
+            string(abi.encodePacked("SY-", symbol)) ,
             yieldRate
         );
         
@@ -100,34 +158,94 @@ contract SYFactory is Ownable, ReentrancyGuard {
             exists: true
         });
         
-        underlyingToSY[underlying] = address(syToken);
+        // Update mappings
+        underlyingToSYByMaturity[underlying][maturity] = address(syToken);
+        availableMaturities[underlying].push(maturity);
+        maturityExists[underlying][maturity] = true;
         allSYTokens.push(address(syToken));
         
-        emit SYTokenCreated(underlying, address(syToken), maturity, yieldRate);
+        emit SYTokenCreated(underlying, address(syToken), maturity, yieldRate, msg.sender);
+        emit MaturityOptionAdded(underlying, maturity, address(syToken));
         
         return address(syToken);
     }
     
     /**
-     * @dev Wrap underlying tokens into SY tokens
+     * @dev Get all available maturities for an underlying asset
      */
-    function wrap(address underlying, uint256 amount) external nonReentrant returns (address) {
-        address syTokenAddress = underlyingToSY[underlying];
-        require(syTokenAddress != address(0), "SY token does not exist");
+    function getAvailableMaturities(address underlying) external view returns (uint256[] memory) {
+        return availableMaturities[underlying];
+    }
+    
+    /**
+     * @dev Get SY token address for specific underlying and maturity
+     */
+    function getSYTokenByMaturity(address underlying, uint256 maturity) external view returns (address) {
+        return underlyingToSYByMaturity[underlying][maturity];
+    }
+
+    /**
+     * @dev Get PT and YT token addresses for a SY token
+     */
+    function getTokenPairByStToken(address syToken) external view returns (address pt, address yt) {
+        TokenPair memory pair = syTokenPairs[syToken];
+        require(pair.exists, "Token pair does not exist");
+        return (pair.pt, pair.yt);
+    }
+    
+    /**
+     * @dev Check if a maturity option exists for an underlying
+     */
+    function hasMaturityOption(address underlying, uint256 maturity) external view returns (bool) {
+        return maturityExists[underlying][maturity];
+    }
+    
+    /**
+     * @dev Wrap underlying tokens into SY tokens with specific maturity
+     */
+    function wrapWithMaturity(
+        address underlying, 
+        uint256 amount, 
+        uint256 maturity
+    ) external nonReentrant returns (address) {
+        address syTokenAddress = underlyingToSYByMaturity[underlying][maturity];
+        if (syTokenAddress == address(0)) revert SYTokenDoesNotExist();
         
         SYToken syToken = SYToken(syTokenAddress);
+        if (syToken.hasMatured()) revert SYTokenHasMatured();
         
-        // Transfer underlying tokens to this contract first
-        IERC20(underlying).transferFrom(msg.sender, address(this), amount);
+        // Direct call - SYToken handles all transfers internally
+        // User → SYToken (no factory middleman)
+        syToken.wrapFrom(msg.sender, amount);
         
-        // Approve SY token to spend underlying tokens
-        IERC20(underlying).approve(address(syToken), amount);
+        emit TokensWrapped(msg.sender, underlying, syTokenAddress, amount, maturity);
         
-        // Wrap tokens
-        syToken.wrap(amount);
+        return syTokenAddress;
+    }
+    
+    /**
+     * @dev Backward compatibility: wrap with default/first available maturity
+     */
+    function wrap(address underlying, uint256 amount) external nonReentrant returns (address) {
+        uint256[] memory maturities = availableMaturities[underlying];
+        if (maturities.length == 0) revert NoMaturityOptionsAvailable();
         
-        // Transfer SY tokens to user
-        syToken.transfer(msg.sender, amount);
+        // Use the first available maturity that hasn't expired
+        uint256 selectedMaturity = 0;
+        for (uint256 i = 0; i < maturities.length; i++) {
+            if (maturities[i] > block.timestamp) {
+                selectedMaturity = maturities[i];
+                break;
+            }
+        }
+        if (selectedMaturity == 0) revert NoValidMaturityOptionsAvailable();
+        
+        // Direct internal call to avoid external call overhead
+        address syTokenAddress = underlyingToSYByMaturity[underlying][selectedMaturity];
+        SYToken syToken = SYToken(syTokenAddress);
+        syToken.wrapFrom(msg.sender, amount);
+        
+        emit TokensWrapped(msg.sender, underlying, syTokenAddress, amount, selectedMaturity);
         
         return syTokenAddress;
     }
@@ -137,14 +255,14 @@ contract SYFactory is Ownable, ReentrancyGuard {
      */
     function split(address syTokenAddress, uint256 amount) external nonReentrant returns (address, address) {
         TokenPair memory pair = syTokenPairs[syTokenAddress];
-        require(pair.exists, "Token pair does not exist");
+        if (!pair.exists) revert TokenPairDoesNotExist();
         
         SYToken syToken = SYToken(syTokenAddress);
         PTToken ptToken = PTToken(pair.pt);
         YTToken ytToken = YTToken(pair.yt);
         
-        require(!syToken.hasMatured(), "SY token has matured");
-        require(syToken.balanceOf(msg.sender) >= amount, "Insufficient SY balance");
+        if (syToken.hasMatured()) revert SYTokenHasMatured();
+        if (syToken.balanceOf(msg.sender) < amount) revert InsufficientSYBalance();
         
         // Burn SY tokens
         syToken.transferFrom(msg.sender, address(this), amount);
@@ -163,21 +281,22 @@ contract SYFactory is Ownable, ReentrancyGuard {
      */
     function merge(address syTokenAddress, uint256 amount) external nonReentrant returns (address) {
         TokenPair memory pair = syTokenPairs[syTokenAddress];
-        require(pair.exists, "Token pair does not exist");
+        if (!pair.exists) revert TokenPairDoesNotExist();
         
+        SYToken syToken = SYToken(syTokenAddress);
         PTToken ptToken = PTToken(pair.pt);
         YTToken ytToken = YTToken(pair.yt);
-        SYToken syToken = SYToken(syTokenAddress);
         
-        require(ptToken.balanceOf(msg.sender) >= amount, "Insufficient PT balance");
-        require(ytToken.balanceOf(msg.sender) >= amount, "Insufficient YT balance");
+        if (syToken.hasMatured()) revert SYTokenHasMatured();
+        if (ptToken.balanceOf(msg.sender) < amount) revert InsufficientPTBalance();
+        if (ytToken.balanceOf(msg.sender) < amount) revert InsufficientYTBalance();
         
         // Burn PT and YT tokens
         ptToken.burn(msg.sender, amount);
         ytToken.burn(msg.sender, amount);
         
-        // Transfer SY tokens to user
-        syToken.transfer(msg.sender, amount);
+        // Mint SY tokens to user
+        syToken.mintTo(msg.sender, amount);
         
         emit TokensMerged(msg.sender, syTokenAddress, amount, pair.pt, pair.yt);
         
@@ -189,10 +308,10 @@ contract SYFactory is Ownable, ReentrancyGuard {
      */
     function redeemPT(address ptTokenAddress) external nonReentrant {
         PTToken ptToken = PTToken(ptTokenAddress);
-        require(ptToken.hasMatured(), "PT token has not matured");
+        if (!ptToken.hasMatured()) revert PTTokenHasNotMatured();
         
         uint256 balance = ptToken.balanceOf(msg.sender);
-        require(balance > 0, "No PT tokens to redeem");
+        if (balance == 0) revert NoPTTokensToRedeem();
         
         ptToken.redeem(balance);
         
@@ -204,23 +323,14 @@ contract SYFactory is Ownable, ReentrancyGuard {
      */
     function claimYT(address ytTokenAddress) external nonReentrant {
         YTToken ytToken = YTToken(ytTokenAddress);
-        require(!ytToken.hasExpired(), "YT token has expired");
+        if (ytToken.hasExpired()) revert YTTokenHasExpired();
         
-        uint256 claimableYield = ytToken.getClaimableYield(msg.sender);
-        require(claimableYield > 0, "No yield to claim");
+        uint256 yieldAmount = ytToken.getClaimableYield(msg.sender);
+        if (yieldAmount == 0) revert NoYieldToClaim();
         
         ytToken.claimYield();
         
-        emit YieldClaimed(msg.sender, ytTokenAddress, claimableYield);
-    }
-    
-    /**
-     * @dev Get PT and YT token addresses for a SY token
-     */
-    function getTokenPair(address syToken) external view returns (address pt, address yt) {
-        TokenPair memory pair = syTokenPairs[syToken];
-        require(pair.exists, "Token pair does not exist");
-        return (pair.pt, pair.yt);
+        emit YieldClaimed(msg.sender, ytTokenAddress, yieldAmount);
     }
     
     /**
@@ -231,9 +341,39 @@ contract SYFactory is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev Get SY token for underlying asset
+     * @dev Set maturity creation fee (only owner)
      */
-    function getSYToken(address underlying) external view returns (address) {
-        return underlyingToSY[underlying];
+    function setMaturityCreationFee(uint256 _fee) external onlyOwner {
+        maturityCreationFee = _fee;
+    }
+    
+    /**
+     * @dev Withdraw collected fees (only owner)
+     */
+    function withdrawFees() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+    
+    /**
+     * @dev Get maturity info for an underlying asset
+     */
+    function getMaturityInfo(address underlying) external view returns (
+        uint256[] memory maturities,
+        address[] memory syTokens,
+        bool[] memory active
+    ) {
+        uint256[] memory availMaturities = availableMaturities[underlying];
+        uint256 length = availMaturities.length;
+        
+        maturities = new uint256[](length);
+        syTokens = new address[](length);
+        active = new bool[](length);
+        
+        for (uint256 i = 0; i < length; i++) {
+            uint256 maturity = availMaturities[i];
+            maturities[i] = maturity;
+            syTokens[i] = underlyingToSYByMaturity[underlying][maturity];
+            active[i] = maturity > block.timestamp;
+        }
     }
 }

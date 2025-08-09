@@ -10,6 +10,14 @@ import "./SYToken.sol";
  * @dev Principal Token representing the principal component of SY tokens
  */
 contract PTToken is ERC20, Ownable {
+    // Custom errors
+    error TokenHasNotMaturedYet();
+    error TokenHasMatured();
+    error InvalidSYTokenAddress();
+    error InsufficientPTBalance();
+    error RedemptionNotEnabled();
+    error AmountMustBeGreaterThanZero();
+    
     SYToken public immutable syToken;
     uint256 public immutable maturity;
     bool public redeemable;
@@ -17,12 +25,12 @@ contract PTToken is ERC20, Ownable {
     event Redeem(address indexed user, uint256 ptAmount, uint256 underlyingAmount);
     
     modifier onlyAfterMaturity() {
-        require(block.timestamp >= maturity, "Token has not matured yet");
+        if (block.timestamp < maturity) revert TokenHasNotMaturedYet();
         _;
     }
     
     modifier onlyBeforeMaturity() {
-        require(block.timestamp < maturity, "Token has matured");
+        if (block.timestamp >= maturity) revert TokenHasMatured();
         _;
     }
     
@@ -31,7 +39,7 @@ contract PTToken is ERC20, Ownable {
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) Ownable(msg.sender) {
-        require(_syToken != address(0), "Invalid SY token address");
+        if (_syToken == address(0)) revert InvalidSYTokenAddress();
         
         syToken = SYToken(_syToken);
         maturity = syToken.maturity();
@@ -63,9 +71,9 @@ contract PTToken is ERC20, Ownable {
      * @dev Redeem PT tokens for underlying tokens after maturity
      */
     function redeem(uint256 amount) external onlyAfterMaturity {
-        require(redeemable, "Redemption not enabled");
-        require(amount > 0, "Amount must be greater than 0");
-        require(balanceOf(msg.sender) >= amount, "Insufficient PT balance");
+        if (!redeemable) revert RedemptionNotEnabled();
+        if (amount == 0) revert AmountMustBeGreaterThanZero();
+        if (balanceOf(msg.sender) < amount) revert InsufficientPTBalance();
         
         // Burn PT tokens
         _burn(msg.sender, amount);
