@@ -477,5 +477,92 @@ export class BlockchainService {
    //dont chnge for now
     return balance;
   }
+
+  /**
+   * Calculate APY from yieldRatePerBlock for MockYieldToken contracts
+   * @param yieldRatePerBlock Yield rate per block in basis points (1 = 0.001%)
+   * @param blocksPerYear Number of blocks per year (default: Core blockchain ~12s blocks)
+   * @returns APY as a percentage
+   */
+  calculateAPYFromBlockRate(yieldRatePerBlock: number, blocksPerYear: number = 2628000): number {
+    // Convert basis points to decimal (1 basis point = 0.001% = 0.00001)
+    const yieldPerBlock = yieldRatePerBlock / 100000;
+    
+    // Calculate compound annual growth
+    // APY = (1 + yieldPerBlock)^blocksPerYear - 1
+    const apy = Math.pow(1 + yieldPerBlock, blocksPerYear) - 1;
+    
+    // Return as percentage
+    return apy * 100;
+  }
+
+  /**
+   * Get yield rate and calculate APY for a MockYieldToken
+   * @param tokenAddress Address of the MockYieldToken contract
+   * @returns Object with yieldRatePerBlock and calculated APY
+   */
+  async getYieldTokenAPY(tokenAddress: string): Promise<{yieldRatePerBlock: number, apy: number}> {
+    try {
+      const yieldRatePerBlock = await readContract(wagmiAdapter.wagmiConfig, {
+        address: tokenAddress as `0x${string}`,
+        abi: [
+          {
+            name: 'yieldRatePerBlock',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [],
+            outputs: [{ name: '', type: 'uint256' }]
+          }
+        ] as const,
+        functionName: 'yieldRatePerBlock'
+      }) as bigint;
+
+      const rate = Number(yieldRatePerBlock);
+      const apy = this.calculateAPYFromBlockRate(rate);
+
+      return { yieldRatePerBlock: rate, apy };
+    } catch (error) {
+      console.error('Error getting yield token APY:', error);
+      return { yieldRatePerBlock: 0, apy: 0 };
+    }
+  }
+
+  /**
+   * Calculate estimated blocks per year based on average block time
+   * @param averageBlockTimeSeconds Average time between blocks in seconds
+   * @returns Estimated blocks per year
+   */
+  calculateBlocksPerYear(averageBlockTimeSeconds: number): number {
+    const secondsPerYear = 365.25 * 24 * 60 * 60; // Account for leap years
+    return Math.floor(secondsPerYear / averageBlockTimeSeconds);
+  }
+
+  /**
+   * Get current block number
+   * @returns Current block number
+   */
+  async getCurrentBlockNumber(): Promise<number> {
+    try {
+      const blockNumber = await readContract(wagmiAdapter.wagmiConfig, {
+        address: '0x0000000000000000000000000000000000000000' as `0x${string}`,
+        abi: [
+          {
+            name: 'number',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [],
+            outputs: [{ name: '', type: 'uint256' }]
+          }
+        ] as const,
+        functionName: 'number'
+      }) as bigint;
+      
+      return Number(blockNumber);
+    } catch (error) {
+      // Fallback: use block.number from a simple contract call
+      console.warn('Could not get block number directly, using fallback');
+      return 0;
+    }
+  }
 }
 

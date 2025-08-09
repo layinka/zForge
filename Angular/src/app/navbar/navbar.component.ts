@@ -24,9 +24,13 @@ export class NavbarComponent {
 
   private chainSubscription: Subscription|undefined=undefined;
   
-  constructor( private w3s: Web3Service){
+  constructor( public w3s: Web3Service){
     
-
+    effect(()=>{
+      if(this.w3s.chainId$()) {
+        this.chainName =ALL_CHAINS[this.w3s.chainId$()??31337]?.name
+      }
+    })
   }
 
   toggleTheme() {
@@ -35,11 +39,7 @@ export class NavbarComponent {
   }
 
   ngOnInit(){
-    effect(()=>{
-      if(this.w3s.chainId$()) {
-        this.chainName =ALL_CHAINS[this.w3s.chainId$()??31337]?.name
-      }
-    })
+    
 
   }
   

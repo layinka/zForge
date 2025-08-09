@@ -145,17 +145,17 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
       const ytTokenArtifact = await hre.artifacts.readArtifact("YTToken");
 
       // Save deployment info
-      await deployments.save(`SY-${yieldToken.symbol}`, {
+      await deployments.save(`SY-${yieldToken.symbol}-${months[i]}M`, {
         abi: syTokenArtifact.abi,
         address: syTokenAddress,
       });
 
-      await deployments.save(`PT-${yieldToken.symbol}`, {
+      await deployments.save(`PT-${yieldToken.symbol}-${months[i]}M`, {
         abi: ptTokenArtifact.abi,
         address: ptAddress,
       });
 
-      await deployments.save(`YT-${yieldToken.symbol}`, {
+      await deployments.save(`YT-${yieldToken.symbol}-${months[i]}M`, {
         abi: ytTokenArtifact.abi,
         address: ytAddress,
       });

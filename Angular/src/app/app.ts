@@ -5,10 +5,11 @@ import { bootstrapHouse } from '@ng-icons/bootstrap-icons';
 import { NavbarComponent } from "./navbar/navbar.component";
 import { Web3Service } from './services/web3';
 import { W3MCoreButtonComponentWrapperComponent } from "./w3-mcore-button-component-wrapper/w3-mcore-button-component-wrapper.component";
+import { ToastsComponent } from './toasts/toasts.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NgIcon, NavbarComponent, W3MCoreButtonComponentWrapperComponent],
+  imports: [RouterOutlet, NgIcon, NavbarComponent, W3MCoreButtonComponentWrapperComponent, ToastsComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   providers: [provideIcons({ bootstrapHouse })],

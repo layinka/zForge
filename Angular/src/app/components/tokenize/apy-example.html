@@ -1,0 +1,97 @@
+<!-- Example template showing how to display APY information for MockYieldToken -->
+<div class="apy-info-card">
+  <h5>Yield Information</h5>
+  
+  <!-- Simple APY Display -->
+  <div class="apy-display">
+    <span class="label">Current APY:</span>
+    <span class="value">{{ getTokenAPY(selectedToken) | async }}</span>
+  </div>
+  
+  <!-- Detailed Yield Information -->
+  <div class="yield-details" *ngIf="selectedToken">
+    <h6>Yield Details</h6>
+    <div class="detail-row">
+      <span>Yield Rate per Block:</span>
+      <span>{{ (getYieldInfo(selectedToken) | async)?.yieldRatePerBlock }} basis points</span>
+    </div>
+    <div class="detail-row">
+      <span>Blocks per Day:</span>
+      <span>{{ (getYieldInfo(selectedToken) | async)?.blocksPerDay }}</span>
+    </div>
+    <div class="detail-row">
+      <span>Annual Percentage Yield:</span>
+      <span class="highlight">{{ (getYieldInfo(selectedToken) | async)?.apy }}</span>
+    </div>
+  </div>
+  
+  <!-- Daily Yield Calculator -->
+  <div class="yield-calculator" *ngIf="wrapAmount">
+    <h6>Expected Daily Yield</h6>
+    <div class="calculator-result">
+      <span>For {{ wrapAmount }} tokens:</span>
+      <span class="yield-amount">{{ calculateDailyYield(selectedToken, +wrapAmount) | async }} tokens/day</span>
+    </div>
+  </div>
+  
+  <!-- APY Explanation -->
+  <div class="apy-explanation">
+    <small class="text-muted">
+      <strong>How APY is calculated:</strong><br>
+      • Yield Rate: {{ (getYieldInfo(selectedToken) | async)?.yieldRatePerBlock }} basis points per block (0.001% = 1 bp)<br>
+      • Block Time: ~12 seconds on Core blockchain<br>
+      • Blocks/Year: ~2,628,000<br>
+      • APY = (1 + yieldPerBlock)^blocksPerYear - 1
+    </small>
+  </div>
+</div>
+
+<style>
+.apy-info-card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.apy-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.highlight {
+  color: #7c3aed;
+  font-weight: bold;
+}
+
+.yield-amount {
+  color: #059669;
+  font-weight: bold;
+}
+
+.calculator-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: #e0f2fe;
+  border-radius: 4px;
+}
+
+.apy-explanation {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dee2e6;
+}
+</style>
