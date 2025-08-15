@@ -1,6 +1,6 @@
 import { computed, effect, Injectable, signal } from '@angular/core';
 import { readContract, writeContract, multicall, waitForTransactionReceipt, simulateContract } from '@wagmi/core';
-import { formatEther, parseEther, formatUnits } from 'viem';
+import { formatEther, parseEther, formatUnits, erc20Abi } from 'viem';
 import { environment, ChainContracts } from '../../environments/environment';
 import { Web3Service, getMultiCallAddress, wagmiAdapter } from './web3';
 import { SY_FACTORY_ABI, SY_TOKEN_ABI, PT_TOKEN_ABI, YT_TOKEN_ABI, ERC20_ABI } from '../abis';
@@ -313,30 +313,44 @@ export class BlockchainService {
   }
 
   async mergePTYT(syTokenAddress: string, amount: string): Promise<void> {
-    await writeContract(wagmiAdapter.wagmiConfig, {
+    let hash = await writeContract(wagmiAdapter.wagmiConfig, {
       address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'merge',
       args: [syTokenAddress as `0x${string}`, parseEther(amount)]
     });
+    await waitForTransactionReceipt(wagmiAdapter.wagmiConfig, { hash });
   }
 
   async redeemPT(ptTokenAddress: string): Promise<void> {
-    await writeContract(wagmiAdapter.wagmiConfig, {
+    let hash = await writeContract(wagmiAdapter.wagmiConfig, {
       address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'redeemPT',
       args: [ptTokenAddress as `0x${string}`]
     });
+    await waitForTransactionReceipt(wagmiAdapter.wagmiConfig, { hash });
+  }
+
+
+  async syFactoryUnderlyingBalance(underlyingAddress: string): Promise<void> {
+    let b = await readContract(wagmiAdapter.wagmiConfig, {
+      address: underlyingAddress as `0x${string}`,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [this.getCurrentChainContracts().syFactory as `0x${string}`]
+    });
+    console.log('hh: balcnace: ', formatEther(b));
   }
 
   async claimYT(ytTokenAddress: string): Promise<void> {
-    await writeContract(wagmiAdapter.wagmiConfig, {
+    let hash = await writeContract(wagmiAdapter.wagmiConfig, {
       address: this.getCurrentChainContracts().syFactory as `0x${string}`,
       abi: SY_FACTORY_ABI,
       functionName: 'claimYT',
       args: [ytTokenAddress as `0x${string}`]
     });
+    await waitForTransactionReceipt(wagmiAdapter.wagmiConfig, { hash });
   }
 
   async getAllSYTokens(): Promise<string[]> {

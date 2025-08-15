@@ -4,25 +4,20 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./SYToken.sol";
+import "./interfaces/IPTToken.sol";
 
 /**
  * @title PTToken
  * @dev Principal Token representing the principal component of SY tokens
  */
-contract PTToken is ERC20, Ownable {
-    // Custom errors
-    error TokenHasNotMaturedYet();
-    error TokenHasMatured();
-    error InvalidSYTokenAddress();
-    error InsufficientPTBalance();
-    error RedemptionNotEnabled();
-    error AmountMustBeGreaterThanZero();
+contract PTToken is ERC20, Ownable,IPTToken {
+    
     
     SYToken public immutable syToken;
     uint256 public immutable maturity;
     bool public redeemable;
     
-    event Redeem(address indexed user, uint256 ptAmount, uint256 underlyingAmount);
+    // event Redeem(address indexed user, uint256 ptAmount, uint256 underlyingAmount);
     
     modifier onlyAfterMaturity() {
         if (block.timestamp < maturity) revert TokenHasNotMaturedYet();

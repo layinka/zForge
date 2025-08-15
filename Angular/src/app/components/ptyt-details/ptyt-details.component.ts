@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, signal, inject, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
@@ -24,8 +24,10 @@ export class PtYtDetailsComponent implements OnInit {
     parseFloat = parseFloat;
     
     // Selected SY token for filtering PT/YT tokens
-    selectedSYToken = signal<SYTokenInfo | null>(null);
+    selectedSYToken = signal<{underlying: string; name: string; symbol: string} | null>(null);
   
+  // Computed property to safely access the selected SY token
+  selectedSYTokenValue = computed(() => this.selectedSYToken());
   
     syTokensList = computed<{underlying: string;name: string;}[]>(() => {
       const syTokens = this.tokenService.syTokens();
@@ -34,6 +36,9 @@ export class PtYtDetailsComponent implements OnInit {
         name: string;
       }[] = [];
       const seenUnderlyings = new Set<string>();
+
+      const ptTokens = this.tokenService.ptTokens();
+      console.log('pttokens', ptTokens)
   
       syTokens.forEach(token => {
         const underlying = token.underlying.toLowerCase();
@@ -49,61 +54,7 @@ export class PtYtDetailsComponent implements OnInit {
       return uniqueTokens;
     })
   
-    // Grouped PT/YT pairs by underlying token
-    filteredTablePairs = computed<{
-      underlying: string;
-      underlyingName: string;
-      name: string;
-      ptToken: { token: TokenInfo; balance: number } | undefined;
-      ytToken: { token: TokenInfo; balance: number } | undefined;
-      maturity: Date;
-      yield: number;
-    }[]>(() => {
-      const syTokens = this.tokenService.syTokens();
-      const ptTokens = this.tokenService.ptTokens();
-      const ytTokens = this.tokenService.ytTokens();
-      const pairs: {
-        underlying: string;
-        underlyingName: string;
-        name: string;
-        ptToken: { token: TokenInfo; balance: number } | undefined;
-        ytToken: { token: TokenInfo; balance: number } | undefined;
-        maturity: Date;
-        yield: number;
-      }[] = [];
-      // const seenUnderlyings = new Set<string>();
-  
-      // First pass: get unique underlying tokens and their names
-      syTokens.forEach(syToken => {
-        const underlying = syToken.underlying.toLowerCase();
-        // if (!seenUnderlyings.has(underlying)) {
-        //   seenUnderlyings.add(underlying);
-         
-          // Find matching PT and YT tokens
-          const ptToken = ptTokens.find(pt => pt.address.toLowerCase() === syToken.ptAddress.toLowerCase());
-          const ytToken = ytTokens.find(yt => yt.address.toLowerCase() === syToken.ytAddress.toLowerCase());
-          console.log('syToken.maturity:',syToken.maturity)
-          // Add pair to list
-          pairs.push({
-            underlying,
-            underlyingName: syToken.name.replace('SY-', ''),
-            name: syToken.name,
-            ptToken: ptToken ? {
-              token: ptToken,
-              balance: parseFloat(ptToken.balance || '0')
-            } : undefined,
-            ytToken: ytToken ? {
-              token: ytToken,
-              balance: parseFloat(ytToken.balance || '0')
-            } : undefined,
-            maturity: new Date(syToken.maturity * 1000),
-            yield: ytToken ? ytToken.decimals : 0
-          });
-        // }
-      });
-      // console.log('pairs:', pairs)
-      return pairs;
-    })
+   
   
     async displayTokenName(address: string){
       const token = await getToken(wagmiConfig, {
@@ -123,7 +74,7 @@ export class PtYtDetailsComponent implements OnInit {
       
       // Filter by SY token's PT address and non-zero balance
       return ptTokens.filter(token => 
-        token.address.toLowerCase() === selectedSY.ptAddress.toLowerCase() &&
+        token.symbol.replace('PT-', '').toLowerCase() === selectedSY.symbol.replace('SY-', '').toLowerCase() &&
         parseFloat(token.balance || '0') > 0
       );
     });
@@ -138,17 +89,12 @@ export class PtYtDetailsComponent implements OnInit {
       
       // Filter by SY token's YT address and non-zero balance
       return ytTokens.filter(token => 
-        token.address.toLowerCase() === selectedSY.ytAddress.toLowerCase() &&
+        token.symbol.replace('YT-', '').toLowerCase() === selectedSY.symbol.replace('SY-', '').toLowerCase() &&
         parseFloat(token.balance || '0') > 0
       );
     });
     
-    // Computed signal for available SY tokens for merging (with non-zero balance)
-    availableSYTokensForMerge = computed(() => {
-      return this.tokenService.syTokens().filter(token => 
-        parseFloat(token.balance || '0') > 0
-      );
-    });
+    
     
     // New properties for staking results
     stakingResult = signal<{
@@ -162,11 +108,36 @@ export class PtYtDetailsComponent implements OnInit {
     private route = inject(ActivatedRoute);
     private toastService = inject(AppToastService);
   
+    pathParams?: {
+      underlying?: string;
+      maturity?: string;
+      read: boolean;
+    }
+
     constructor(
       public blockchainService: BlockchainService,
       public tokenService: TokenService,
       public w3s: Web3Service
-    ) {}
+    ) {
+      effect(()=>{
+        const syTokens = this.tokenService.syTokens();
+        if(syTokens.length > 0){
+          if(this.pathParams && !this.pathParams.read){
+            this.pathParams = {
+              ...this.pathParams,
+              read: true
+            }
+            this.setSelectedSYTokenFromParams(this.pathParams?.underlying || '', this.pathParams?.maturity || '');
+          }
+        }
+
+        // this.blockchainService.syFactoryUnderlyingBalance('0x09635F643e140090A9A8Dcd712eD6285858ceBef');
+      })
+
+
+    }
+
+
   
     async ngOnInit() {
       if (this.blockchainService.isConnected()) {
@@ -182,43 +153,50 @@ export class PtYtDetailsComponent implements OnInit {
         if(staked){
           await this.loadStakingResult(underlying, maturity);
         }
+        this.pathParams = {
+          underlying,
+          maturity,
+          read: false
+        }
         // Set the selected SY token based on route parameters
-        await this.setSelectedSYTokenFromParams(underlying, maturity);
+        // await this.setSelectedSYTokenFromParams(underlying, maturity);
       }
     }
     
     private async setSelectedSYTokenFromParams(underlying: string, maturity: string) {
+      
       // Wait for tokens to be loaded
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       const syTokens = this.tokenService.syTokens();
+      if(syTokens.length === 0){
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
       const matchingSYToken = syTokens.find(token => 
         token.underlying.toLowerCase() === underlying.toLowerCase() &&
         token.maturity.toString() === maturity
       );
-      
+
       if (matchingSYToken) {
         this.selectedSYToken.set(matchingSYToken);
       }
     }
     
     // Method to manually select SY token for filtering
-    selectSYToken(syToken: SYTokenInfo | null) {
+    selectSYToken(syToken: {underlying: string; name: string; symbol: string} | null) {
       this.selectedSYToken.set(syToken);
+    }
+
+
+    compareTokens(t1: SYTokenInfo | null, t2: SYTokenInfo | null): boolean {
+      // console.log('t1', t1, 't2', t2)
+      if (!t1 || !t2) return false;
+      return t1.underlying.toLowerCase().trim() === t2.underlying.toLowerCase().trim();
     }
     
     // Handle SY token filter change from dropdown
-    onSYTokenFilterChange(syTokenAddress: string) {
-      if (!syTokenAddress) {
-        this.selectedSYToken.set(null);
-        return;
-      }
-      
-      const syToken = this.tokenService.syTokens().find(token => 
-        token.address === syTokenAddress
-      );
-      
-      this.selectedSYToken.set(syToken || null);
+    onSYTokenFilterChange(syToken: {underlying: string; name: string, symbol: string} | null) {
+      this.selectedSYToken.set(syToken);
     }
     
     // Format maturity timestamp to readable date
@@ -255,6 +233,40 @@ export class PtYtDetailsComponent implements OnInit {
         // this.spinner.hide();
       }
     }
+
+    async tradePT(ptTokenAddress: string) {
+      const dexUrl = `https://app.uniswap.org/#/swap?inputCurrency=${ptTokenAddress}&outputCurrency=${this.selectedSYToken()?.underlying}`;
+      window.open(dexUrl, '_blank');
+      // this.isProcessing.set(true);
+      // // this.spinner.show();
+  
+      // try {
+      //   await this.blockchainService.claimYT(ytTokenAddress);
+      //   await this.tokenService.refreshAllBalances();
+      // } catch (error: any) {
+      //   console.error('Error claiming yield:', error);
+      // } finally {
+      //   this.isProcessing.set(false);
+      //   // this.spinner.hide();
+      // }
+    }
+
+    async tradeYT(ytTokenAddress: string) {
+      const dexUrl = `https://app.uniswap.org/#/swap?inputCurrency=${ytTokenAddress}&outputCurrency=${this.selectedSYToken()?.underlying}`;
+      window.open(dexUrl, '_blank');
+      // this.isProcessing.set(true);
+      // // this.spinner.show();
+  
+      // try {
+      //   await this.blockchainService.claimYT(ytTokenAddress);
+      //   await this.tokenService.refreshAllBalances();
+      // } catch (error: any) {
+      //   console.error('Error claiming yield:', error);
+      // } finally {
+      //   this.isProcessing.set(false);
+      //   // this.spinner.hide();
+      // }
+    }
   
     async claimAllYield() {
       this.isProcessing.set(true);
@@ -283,7 +295,7 @@ export class PtYtDetailsComponent implements OnInit {
       // this.spinner.show();
   
       try {
-        await this.blockchainService.mergePTYT(this.selectedSYForMerge, this.mergeAmount);
+        await this.blockchainService.mergePTYT(this.selectedSYForMerge, this.mergeAmount.toString());
         await this.tokenService.refreshAllBalances();
         
         // Reset form

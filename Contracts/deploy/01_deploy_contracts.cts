@@ -96,6 +96,9 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
 
   const factoryContract = await ethers.getContractAt("SYFactory", syFactory.address);
   
+  let maturities = [];
+  let ptTokens = {};
+  let ytTokens = {};
   // Process yield tokens sequentially
   for (const yieldToken of yieldTokens) {
     const yieldPerBlock = yieldToken.yieldRatePerBlock/1e8;
@@ -113,10 +116,15 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
     }
 
     let months = [3,6,12];
+    ptTokens[yieldTokenContractDetails.address] = [];
+    ytTokens[yieldTokenContractDetails.address] = [];
+    
     for (let i = 0; i < months.length; i++) {
       
       // Create a SY token for stCORE with 6-month maturity and 5% yield
       const maturity = Math.floor(Date.now() / 1000) + (months[i] * 30 * 24 * 60 * 60); 
+      
+      maturities.push(maturity);
       const yieldRateBasisPoints = convertBlockRateToAnnualBasisPoints(yieldPerBlock, 3);
       
       // Calculate APY from basis points for display
@@ -138,7 +146,8 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
       const [ptAddress, ytAddress] = await factoryContract.getTokenPairByStToken(syTokenAddress);
       console.log(`PT-${yieldToken.symbol} token created at:`, ptAddress);
       console.log(`YT-${yieldToken.symbol} token created at:`, ytAddress);
-
+      ptTokens[yieldTokenContractDetails.address].push(ptAddress);
+      ytTokens[yieldTokenContractDetails.address].push(ytAddress);
       // Get ABIs from compiled artifacts since these contracts are deployed by factory
       const syTokenArtifact = await hre.artifacts.readArtifact("SYToken");
       const ptTokenArtifact = await hre.artifacts.readArtifact("PTToken");
@@ -159,8 +168,60 @@ const func = async function (hre: HardhatRuntimeEnvironment) {
         abi: ytTokenArtifact.abi,
         address: ytAddress,
       });
+
+      // ptTokens[yieldToken.address].push(ptAddress);
+      // ytTokens[yieldToken.address].push(ytAddress);
+
     }
   }
+
+
+  //================================================================
+  // // Get mockStCORE token instance
+  // const mockStCORE = await ethers.getContractAt(
+  //   "MockYieldToken",
+  //   yieldTokenContracts[0].address
+  // );
+
+  
+  // // Approve SYFactory to spend stCORE tokens (max uint256)
+  // console.log("Approving SYFactory to spend stCORE...");
+  // const syTokenAddress1 = await factoryContract.getSYTokenByMaturity(yieldTokenContracts[0].address, maturities[0]);
+  // let txApprov = await mockStCORE.approve(syFactory.address, ethers.MaxUint256-1n);
+  // await txApprov.wait();
+  // let txApprov2 = await mockStCORE.approve(syTokenAddress1, ethers.MaxUint256-1n);
+  // await txApprov2.wait();
+  // console.log("Approval complete");
+
+  // // Wrap 100 stCORE tokens
+  // const amount = ethers.parseEther("100");
+  // console.log(`Wrapping ${ethers.formatEther(amount)} stCORE...`);
+
+  // const wrapTx = await factoryContract.wrapWithMaturity(
+  //   yieldTokenContracts[0].address,    
+  //   amount,
+  //   maturities[0],
+  //   { value: 0 }
+  // );
+  // await wrapTx.wait();
+  // console.log("Wrap transaction complete", ptTokens);
+
+  // // Get pt balance
+  // const pt = await ethers.getContractAt(
+  //   "PTToken",
+  //   ptTokens[yieldTokenContracts[0].address][0]
+  // );
+  // const ptBalance = await pt.balanceOf(deployer);
+  // console.log(`PT balance: ${ethers.formatEther(ptBalance)}`);
+
+  
+  
+  // // Merge 5 SY tokens back to stCORE
+  // const mergeAmount = ethers.parseEther("5");
+  // console.log(`Merging ${ethers.formatEther(mergeAmount)} SY tokens...`);
+  // const mergeTx = await factoryContract.merge(syTokenAddress1, mergeAmount);
+  // await mergeTx.wait();
+  // console.log("Merge transaction complete");
 
   
 

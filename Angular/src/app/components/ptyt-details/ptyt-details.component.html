@@ -103,8 +103,8 @@
                       <tr>
                         <td>
                           <div class="d-flex align-items-center">
-                            <span class="token-badge bg-primary me-2">{{ ptToken.symbol }}</span>
-                            {{ ptToken.name }}
+                            <span class="badge bg-primary">{{  ptToken.symbol || selectedSYToken()?.symbol  }}</span>
+                            <!-- {{ ptToken.name }} -->
                           </div>
                         </td>
                         <td>{{ parseFloat(ptToken.balance || '0') | number:'1.0-4' }}</td>
@@ -117,16 +117,22 @@
                           }
                         </td>
                         <td>
-                          @if (isPTMatured(ptToken.address) && parseFloat(ptToken.balance) > 0) {
+                          <!-- @if (isPTMatured(ptToken.address) && parseFloat(ptToken.balance) > 0) { -->
                             <button 
                               class="btn btn-success btn-sm"
                               (click)="redeemPT(ptToken.address)"
-                              [disabled]="isProcessing()">
+                              [disabled]="!(isPTMatured(ptToken.address) && parseFloat(ptToken.balance) > 0) || isProcessing()">
                               Redeem
                             </button>
-                          } @else {
+                          <!-- } @else {
                             <span class="text-muted">-</span>
-                          }
+                          } -->
+                          <!-- <button 
+                            class="btn btn-warning btn-sm ms-2"
+                            (click)="tradePT(ptToken.address)"
+                            [disabled]="isProcessing()">
+                            Trade
+                          </button> -->
                         </td>
                       </tr>
                     }
@@ -137,7 +143,7 @@
               <div class="text-center py-4">
                 <i class="bi bi-inbox display-1 text-muted"></i>
                 <p class="text-muted mt-2">
-                  @if (selectedSYToken()) {
+                  @if (selectedSYToken() !== null) {
                     No PT tokens found for selected SY token
                   } @else {
                     No PT tokens with balance found. Stake tokens to generate PT tokens.
@@ -172,7 +178,7 @@
                         <td>
                           <div class="d-flex align-items-center">
                             <span class="token-badge bg-warning me-2">{{ ytToken.symbol }}</span>
-                            {{ ytToken.name }}
+                            <!-- {{ ytToken.name }} -->
                           </div>
                         </td>
                         <td>{{ parseFloat(ytToken.balance || '0') | number:'1.0-4' }}</td>
@@ -190,16 +196,22 @@
                           }
                         </td>
                         <td>
-                          @if (!isYTExpired(ytToken.address) && parseFloat(getYTClaimableYield(ytToken.address)) > 0) {
+                          <!-- @if (!isYTExpired(ytToken.address) && parseFloat(getYTClaimableYield(ytToken.address)) > 0) { -->
                             <button 
                               class="btn btn-warning btn-sm"
                               (click)="claimYield(ytToken.address)"
-                              [disabled]="isProcessing()">
+                              [disabled]="!(!isYTExpired(ytToken.address) && parseFloat(getYTClaimableYield(ytToken.address)) > 0) || isProcessing()">
                               Claim
                             </button>
-                          } @else {
-                            <span class="text-muted">-</span>
-                          }
+                          <!-- } @else { -->
+                            
+                            <button 
+                              class="btn btn-warning btn-sm ms-2"
+                              (click)="tradeYT(ytToken.address)"
+                              [disabled]="isProcessing()">
+                              Trade
+                            </button>
+                          <!-- } -->
                         </td>
                       </tr>
                     }
@@ -210,7 +222,7 @@
               <div class="text-center py-4">
                 <i class="bi bi-inbox display-1 text-muted"></i>
                 <p class="text-muted mt-2">
-                  @if (selectedSYToken()) {
+                  @if (selectedSYToken() !== null) {
                     No YT tokens found for selected SY token
                   } @else {
                     No YT tokens with balance found. Stake tokens to generate YT tokens.
@@ -238,11 +250,12 @@
             <label class="form-label fw-semibold">Select Yield Token to Filter</label>
             <select 
               class="form-select" 
-              [ngModel]="selectedSYToken()?.address || ''"
-              (ngModelChange)="onSYTokenFilterChange($event)">
-              <option value="">Show All PT/YT Tokens</option>
+              [ngModel]="selectedSYToken()"
+              (ngModelChange)="onSYTokenFilterChange($event)"
+              [compareWith]="compareTokens">
+              <option [ngValue]="null">Show All PT/YT Tokens</option>
               @for (syToken of syTokensList(); track syToken.underlying) {
-                <option [value]="syToken.underlying">
+                <option [ngValue]="syToken">
                   {{ syToken.name }}
                 </option>
               }
@@ -251,9 +264,8 @@
           @if (selectedSYToken()) {
             <div class="alert alert-info">
               <small>
-                <strong>Filtering:</strong> Showing PT/YT tokens for {{ selectedSYToken()!.name }}
-                <br>
-                <strong>Maturity:</strong> {{ formatMaturity(selectedSYToken()!.maturity) }}
+                <strong>Filtering:</strong>
+                <h3 class="card-title">PT/YT Tokens for {{ selectedSYToken()?.name || 'All' }}</h3>
               </small>
             </div>
           }
@@ -278,12 +290,12 @@
                 name="selectedSYForMerge"
                 required>
                 <option value="">Choose SY token...</option>
-                @for (syToken of availableSYTokensForMerge(); track syToken.address) {
-                  @if (canMerge(syToken.address)) {
-                    <option [value]="syToken.address">
-                      {{ syToken.name }} ({{ parseFloat(syToken.balance || '0') | number:'1.0-4' }})
+                @for (syToken of syTokensList(); track syToken.underlying) {
+                  <!-- @if (canMerge(syToken.underlying)) { -->
+                    <option [value]="syToken.underlying">
+                      {{ syToken.name }} <!--  ({{ parseFloat(syToken.balance || '0') | number:'1.0-4' }}) -->
                     </option>
-                  }
+                  <!-- } -->
                 }
               </select>
             </div>
@@ -300,18 +312,18 @@
                     placeholder="0.0"
                     step="0.001"
                     min="0"
-                    [max]="getMaxMergeAmount()"
+                    [max]="100000"
                     required>
-                  <button 
+                  <!-- <button 
                     type="button" 
                     class="btn btn-outline-secondary"
                     (click)="setMaxMergeAmount()">
                     MAX
-                  </button>
+                  </button> -->
                 </div>
-                <small class="text-muted">
+                <!-- <small class="text-muted">
                   Max: {{ getMaxMergeAmount() }}
-                </small>
+                </small> -->
               </div>
   
               <div class="alert alert-info">

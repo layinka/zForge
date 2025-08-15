@@ -5,16 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./SYToken.sol";
+import "./interfaces/IYTToken.sol";
 
 /**
  * @title YTToken
  * @dev Yield Token representing the yield component of SY tokens
  */
-contract YTToken is ERC20, Ownable, ReentrancyGuard {
-    // Custom errors
-    error TokenHasExpired();
-    error InvalidSYTokenAddress();
-    error NoYieldToClaim();
+contract YTToken is ERC20, Ownable, ReentrancyGuard, IYTToken {
+    
     
     SYToken public immutable syToken;
     uint256 public immutable maturity;
@@ -22,7 +20,7 @@ contract YTToken is ERC20, Ownable, ReentrancyGuard {
     mapping(address => uint256) public lastClaimTime;
     mapping(address => uint256) public totalYieldClaimed;
     
-    event YieldClaimed(address indexed user, uint256 yieldAmount);
+    // event YieldClaimed(address indexed user, uint256 yieldAmount);
     
     modifier onlyBeforeMaturity() {
         if (block.timestamp >= maturity) revert TokenHasExpired();

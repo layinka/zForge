@@ -3,11 +3,12 @@ pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./SYToken.sol";
 import "./PTToken.sol";
 import "./YTToken.sol";
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 /**
  * @title SYFactory - Yield Tokenization Factory
@@ -45,6 +46,7 @@ import "./YTToken.sol";
  * - Gas optimization: Combined operations reduce transaction costs
  */
 contract SYFactory is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     // Custom errors
     error InvalidUnderlyingToken();
     error MaturityTooSoon();
@@ -231,12 +233,12 @@ contract SYFactory is Ownable, ReentrancyGuard {
         return (pair.pt, pair.yt);
     }
     
-    /**
-     * @dev Check if a maturity option exists for an underlying
-     */
-    function hasMaturityOption(address underlying, uint256 maturity) external view returns (bool) {
-        return underlyingToSYByMaturity[underlying][maturity] != address(0);
-    }
+    // /**
+    //  * @dev Check if a maturity option exists for an underlying
+    //  */
+    // function hasMaturityOption(address underlying, uint256 maturity) external view returns (bool) {
+    //     return underlyingToSYByMaturity[underlying][maturity] != address(0);
+    // }
     
     /**
      * @dev Get all underlying tokens that have SY tokens created
@@ -292,18 +294,18 @@ contract SYFactory is Ownable, ReentrancyGuard {
         return syTokenAddress;
     }
 
-    /**
-     * @dev Split SY tokens into PT and YT tokens
-     * 
-     * USE CASES FOR split() (separate from wrapAndSplit):
-     * - Users who already hold SY tokens and want to split them later
-     * - Users who received SY tokens from other sources (transfers, rewards, etc.)
-     * - Timing strategies: wrap first, split when market conditions are favorable
-     * - Partial splitting: split only a portion of held SY tokens
-     */
-    function split(address syTokenAddress, uint256 amount) public nonReentrant returns (address, address) {
-        return _split(syTokenAddress, amount, msg.sender, msg.sender);
-    }
+    // /**TODO
+    //  * @dev Split SY tokens into PT and YT tokens
+    //  * 
+    //  * USE CASES FOR split() (separate from wrapAndSplit):
+    //  * - Users who already hold SY tokens and want to split them later
+    //  * - Users who received SY tokens from other sources (transfers, rewards, etc.)
+    //  * - Timing strategies: wrap first, split when market conditions are favorable
+    //  * - Partial splitting: split only a portion of held SY tokens
+    //  */
+    // function split(address syTokenAddress, uint256 amount) public nonReentrant returns (address, address) {
+    //     return _split(syTokenAddress, amount, msg.sender, msg.sender);
+    // }
     
     /**
      * @dev Internal split function that can handle different token holders and recipients
@@ -422,9 +424,10 @@ contract SYFactory is Ownable, ReentrancyGuard {
      * @dev Merge PT and YT tokens back into SY tokens
      */
     function merge(address syTokenAddress, uint256 amount) external nonReentrant returns (address) {
+        // console.log("start.0" );
         TokenPair memory pair = syTokenPairs[syTokenAddress];
         if (!pair.exists) revert TokenPairDoesNotExist();
-        
+        // console.log("start 1.0" );
         SYToken syToken = SYToken(syTokenAddress);
         PTToken ptToken = PTToken(pair.pt);
         YTToken ytToken = YTToken(pair.yt);
@@ -432,13 +435,19 @@ contract SYFactory is Ownable, ReentrancyGuard {
         if (syToken.hasMatured()) revert SYTokenHasMatured();
         if (ptToken.balanceOf(msg.sender) < amount) revert InsufficientPTBalance();
         if (ytToken.balanceOf(msg.sender) < amount) revert InsufficientYTBalance();
-        
+        // console.log("1.0" );
         // Burn PT and YT tokens
         ptToken.burn(msg.sender, amount);
         ytToken.burn(msg.sender, amount);
-        
-        // Mint SY tokens to user
-        syToken.mintTo(msg.sender, amount);
+        console.log("1.2.0" );
+        //TODO: Mint SY tokens to user 
+        // syToken.mintTo(msg.sender, amount);
+       console.log("2.0" );
+        // Transfer underlying tokens to user using SafeERC20
+        IERC20 underlyingToken = IERC20(syToken.underlyingToken());
+        console.log("2. %d", underlyingToken.balanceOf(address(this)) );
+        // underlyingToken.safeTransfer(msg.sender, amount);
+        underlyingToken.safeTransferFrom(syTokenAddress,msg.sender, amount);
         
         emit TokensMerged(msg.sender, syTokenAddress, amount, pair.pt, pair.yt);
         
@@ -482,19 +491,20 @@ contract SYFactory is Ownable, ReentrancyGuard {
         return allSYTokens;
     }
     
-    /**
-     * @dev Set maturity creation fee (only owner)
-     */
-    function setMaturityCreationFee(uint256 _fee) external onlyOwner {
-        maturityCreationFee = _fee;
-    }
+    //Todo : 
+    // /**
+    //  * @dev Set maturity creation fee (only owner)
+    //  */
+    // function setMaturityCreationFee(uint256 _fee) external onlyOwner {
+    //     maturityCreationFee = _fee;
+    // }
     
-    /**
-     * @dev Withdraw collected fees (only owner)
-     */
-    function withdrawFees() external onlyOwner {
-        payable(owner()).transfer(address(this).balance);
-    }
+    // /**
+    //  * @dev Withdraw collected fees (only owner)
+    //  */
+    // function withdrawFees() external onlyOwner {
+    //     payable(owner()).transfer(address(this).balance);
+    // }
     
     /**
      * @dev Get maturity info for an underlying asset

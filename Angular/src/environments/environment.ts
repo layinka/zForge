@@ -15,14 +15,14 @@ export interface ChainContracts {
 const ALL_CONTRACTS: Record<number, ChainContracts> = {
   // Hardhat Local Network (Chain ID: 31337)
   31337: {
-    syFactory: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9', // Will be updated after deployment
-    mockStCORE: '0x5FbDB2315678afecb367f032d93F642f64180aa3', // Will be updated after deployment
+    syFactory: '0xeF31027350Be2c7439C1b0BE022d49421488b72C', // Will be updated after deployment
+    mockStCORE: '0x09635F643e140090A9A8Dcd712eD6285858ceBef', // Will be updated after deployment
     ptToken: '0x9f1ac54BEF0DD2f6f3462EA0fa94fC62300d3a8e', // Will be updated after deployment
     ytToken: '0xbf9fBFf01664500A33080Da5d437028b07DFcC55', // Will be updated after deployment
   },
   // Core DAO Testnet 2 (Chain ID: 1114)
   1114: {
-    syFactory: '0xE3cB58467250bd4178d737A87B87dc7AE00Dad62', // Will be updated after deployment
+    syFactory: '0x9F8FBFb135bfA9233347FA43516E6Ce233EA7e1D', // Will be updated after deployment
     mockStCORE: '0x9ED133F814534B89c530909b9EfBAf226e6C9A4f', // Will be updated after deployment
     ptToken: '0x...', // Will be updated after deployment
     ytToken: '0x...', // Will be updated after deployment
