@@ -2,17 +2,23 @@ import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { ActivatedRoute } from '@angular/router';
-import { BlockchainService, SYTokenInfo } from '../../services/blockchain.service';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { BlockchainService, SYTokenInfo, TokenInfo } from '../../services/blockchain.service';
 import { TokenService } from '../../services/token.service';
 import { AppToastService } from '../../services/app-toast.service';
+import { wagmiConfig, Web3Service } from '@app/services/web3';
+import { fetchToken, getToken } from '@wagmi/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { CoinGeckoService } from '@app/services/coingecko.service';
+import { bootstrapCurrencyDollar } from '@ng-icons/bootstrap-icons';
 
 @Component({
   selector: 'app-ptyt',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModule],
+  imports: [CommonModule, FormsModule, NgbModule, NgIcon, RouterLink],
   templateUrl: './ptyt.component.html',
-  styleUrl: './ptyt.component.scss'
+  styleUrl: './ptyt.component.scss',
+  providers: [provideIcons({ bootstrapCurrencyDollar })]
 })
 export class PtytComponent implements OnInit {
   selectedSYForMerge = '';
@@ -20,8 +26,129 @@ export class PtytComponent implements OnInit {
   isProcessing = signal(false);
   parseFloat = parseFloat;
   
+  coingeckoService = inject(CoinGeckoService);
   // Selected SY token for filtering PT/YT tokens
   selectedSYToken = signal<SYTokenInfo | null>(null);
+
+
+  syTokensList = computed<{underlying: string;name: string;}[]>(() => {
+    const syTokens = this.tokenService.syTokens();
+    const uniqueTokens: {
+      underlying: string;
+      name: string;
+    }[] = [];
+    const seenUnderlyings = new Set<string>();
+
+    syTokens.forEach(token => {
+      const underlying = token.underlying.toLowerCase();
+      if (!seenUnderlyings.has(underlying)) {
+        seenUnderlyings.add(underlying);
+        uniqueTokens.push({
+          underlying,
+          name: token.name, 
+        });
+      }
+    });
+
+    return uniqueTokens;
+  })
+
+  // Track prices separately with a signal
+  tokenPrices = signal<{[key: string]: number}>({});
+
+  // Fetch and update token prices
+  private async updateTokenPrices() {
+    const prices: {[key: string]: number} = {};
+    const tokens = [...this.tokenService.syTokens()/*, ...this.tokenService.ptTokens(), ...this.tokenService.ytTokens()*/];
+    
+    // return;
+    for (const token of tokens) {
+      try {
+        const price = await this.coingeckoService.getCoinPriceFromSymbol(token.symbol.replace('SY-', ''));
+        
+        prices[token.symbol.replace('SY-', '')] = price;
+      } catch (error) {
+        console.error(`Error fetching price for ${token.symbol}:`, error);
+        prices[token.symbol] = 0; // Default to 0 if price fetch fails
+      }
+    }
+    
+    this.tokenPrices.set(prices);
+  }
+
+  // Grouped PT/YT pairs by underlying token
+  filteredTablePairs = computed<{
+    underlying: string;
+    underlyingName: string;
+    underlyingPrice: number;
+    name: string;
+    ptToken: { token: TokenInfo; balance: number; price: number, apy?: number} | undefined;
+    ytToken: { token: TokenInfo; balance: number; price: number, apy?: number } | undefined;
+    maturityDate: Date;
+    maturity: number;
+    yield: number;
+  }[]>(() => {
+    const syTokens = this.tokenService.syTokens();
+    const ptTokens = this.tokenService.ptTokens();
+    const ytTokens = this.tokenService.ytTokens();
+    const currentPrices = this.tokenPrices();
+    // console.log('currentprices now ', currentPrices)
+    const pairs: {
+      underlying: string;
+      underlyingName: string;
+      underlyingPrice: number;
+      name: string;
+      ptToken: { token: TokenInfo; balance: number; price: number } | undefined;
+      ytToken: { token: TokenInfo; balance: number; price: number } | undefined;
+      maturityDate: Date;
+      maturity: number;
+      yield: number;
+    }[] = [];
+    // const seenUnderlyings = new Set<string>();
+
+    // First pass: get unique underlying tokens and their names
+    syTokens.forEach(syToken => {
+      const underlying = syToken.underlying.toLowerCase();
+      // if (!seenUnderlyings.has(underlying)) {
+      //   seenUnderlyings.add(underlying);
+       
+        // Find matching PT and YT tokens
+        const ptToken = ptTokens.find(pt => pt.address.toLowerCase() === syToken.ptAddress.toLowerCase());
+        const ytToken = ytTokens.find(yt => yt.address.toLowerCase() === syToken.ytAddress.toLowerCase());
+        
+        // Add pair to list
+        pairs.push({
+          underlying,
+          underlyingName: syToken.name.replace('SY-', ''),
+          name: syToken.name,
+          underlyingPrice: currentPrices[syToken.symbol.replace('SY-', '')] || 0,
+          ptToken: ptToken ? {
+            token: ptToken,
+            balance: parseFloat(ptToken.balance || '0'),
+            price: currentPrices[ptToken.symbol] || 0
+          } : undefined,
+          ytToken: ytToken ? {
+            token: ytToken,
+            balance: parseFloat(ytToken.balance || '0'),
+            price: currentPrices[ytToken.symbol] || 0
+          } : undefined,
+          maturityDate: new Date(syToken.maturity * 1000),
+          maturity: syToken.maturity,
+          yield: Number(syToken.yieldRate) / 100
+        });
+      // }
+    });
+    
+    // console.log('pairs:', pairs)
+    return pairs;
+  })
+
+  async displayTokenName(address: string){
+    const token = await getToken(wagmiConfig, {
+      address: address as `0x${string}`
+    })
+    return token.name;
+  }
   
   // Computed signals for filtered PT/YT tokens
   filteredPTTokens = computed(() => {
@@ -75,7 +202,8 @@ export class PtytComponent implements OnInit {
 
   constructor(
     public blockchainService: BlockchainService,
-    public tokenService: TokenService
+    public tokenService: TokenService,
+    public w3s: Web3Service
   ) {}
 
   async ngOnInit() {
@@ -92,6 +220,14 @@ export class PtytComponent implements OnInit {
       // Set the selected SY token based on route parameters
       await this.setSelectedSYTokenFromParams(underlying, maturity);
     }
+    
+    // Initial price update
+    await this.updateTokenPrices();
+    
+    // Update prices every minute
+    setInterval(async () => {
+      await this.updateTokenPrices();
+    }, 5000);
   }
   
   private async setSelectedSYTokenFromParams(underlying: string, maturity: string) {

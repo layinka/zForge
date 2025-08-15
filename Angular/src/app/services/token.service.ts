@@ -88,7 +88,7 @@ export class TokenService {
     // Effect for chain changes
     effect(() => {
       const chainId = this.web3Service.chainId$();
-      console.log('ChainId signal changed:', chainId);
+      // console.log('ChainId signal changed:', chainId);
       if (chainId) {
         untracked(() => {
           this.updateCurrentChainSignals();
@@ -310,18 +310,23 @@ export class TokenService {
           // Get PT token info
           if (syTokenInfo.ptAddress && syTokenInfo.ptAddress !== '0x0000000000000000000000000000000000000000') {
             const ptTokenInfo = await this.blockchainService.getTokenInfo(syTokenInfo.ptAddress);
+            
+            let apy = this.blockchainService.randomAPY(syTokenInfo.apy??0)
             ptTokens.push({
               ...ptTokenInfo,
-              address: syTokenInfo.ptAddress
+              address: syTokenInfo.ptAddress,
+              apy : apy/100
             });
           }
           
           // Get YT token info
           if (syTokenInfo.ytAddress && syTokenInfo.ytAddress !== '0x0000000000000000000000000000000000000000') {
             const ytTokenInfo = await this.blockchainService.getTokenInfo(syTokenInfo.ytAddress);
+            let apy = this.blockchainService.randomAPY(syTokenInfo.apy??0)
             ytTokens.push({
               ...ytTokenInfo,
-              address: syTokenInfo.ytAddress
+              address: syTokenInfo.ytAddress,
+              apy : (apy/100) + (Math.random() * 15)
             });
           }
         } catch (error) {

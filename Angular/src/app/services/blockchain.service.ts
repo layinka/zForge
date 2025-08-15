@@ -11,6 +11,7 @@ export interface TokenInfo {
   symbol: string;
   balance: string;
   decimals: number;
+  apy?: number;
 }
 
 export interface SYTokenInfo extends TokenInfo {
@@ -22,6 +23,7 @@ export interface SYTokenInfo extends TokenInfo {
   ytAddress: string;
   claimableYield: string;
   yieldRate: bigint;
+  apy?: number;
 }
 
 @Injectable({
@@ -64,6 +66,57 @@ export class BlockchainService {
     }) as bigint;
     
     return formatEther(balance);
+  }
+
+  /**
+   * Gets the current APY from a MockYieldToken with a small random variation
+   * @param tokenAddress Address of the MockYieldToken contract
+   * @returns APY as a percentage (e.g., 5.25 for 5.25%)
+   */
+  async getAPYFromYieldToken(tokenAddress: string): Promise<number> {
+    try {
+      // Get the yield rate per block from the MockYieldToken
+      const yieldRatePerBlock = await readContract(wagmiAdapter.wagmiConfig, {
+        address: tokenAddress as `0x${string}`,
+        abi: [
+          {
+            "inputs": [],
+            "name": "yieldRatePerBlock",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+          }
+        ],
+        functionName: 'yieldRatePerBlock',
+      }) as bigint;
+
+      // Convert yield rate (per block) to APY
+      // Assuming 12s block time (2,628,000 blocks per year)
+      const BLOCKS_PER_YEAR = 2_628_000n;
+      const baseAPY = Number(yieldRatePerBlock) * Number(BLOCKS_PER_YEAR) / 1e18 * 100;
+      
+      // Add random variation between -0.1% and +5%
+      const variation = (Math.random() * 5.1) - 0.1; // -0.1 to 5.0
+      const finalAPY = baseAPY + variation;
+      
+      // Ensure APY is not negative
+      return Math.max(0, finalAPY);
+    } catch (error) {
+      console.error('Error fetching APY from yield token:', error);
+      // Return a reasonable default if there's an error
+      return 2.5; // 2.5% default APY
+    }
+  }
+
+  randomAPY(apy: number): number {
+    const baseAPY = apy;
+      
+      // Add random variation between -0.1% and +5%
+      const variation = (Math.random() * 5.1) - 0.1; // -0.1 to 5.0
+      const finalAPY = baseAPY + variation;
+      
+      // Ensure APY is not negative
+      return Math.max(0, finalAPY);
   }
 
   async getTokenInfo(tokenAddress: string, userAddress?: string): Promise<TokenInfo> {
@@ -186,6 +239,7 @@ export class BlockchainService {
       }) as Promise<number>
     ]);
 
+    const apy = this.randomAPY(Number(yieldRate));
     return {
       address: syTokenAddress,
       name: `SY-${name}`,
@@ -199,7 +253,8 @@ export class BlockchainService {
       ptAddress: tokenPair[0],
       ytAddress: tokenPair[1],
       claimableYield: formatUnits(claimableYield, decimals),
-      yieldRate
+      yieldRate,
+      apy
     };
   }
 

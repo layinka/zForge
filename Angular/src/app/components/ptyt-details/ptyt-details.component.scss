@@ -1,0 +1,72 @@
+.gradient-text {
+    background: linear-gradient(135deg, var(--primary-purple), var(--secondary-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .token-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+  }
+  
+  .table th {
+    border-top: none;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+  
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .card-header h5 {
+    color: white;
+  }
+  
+  // Staking celebration styles
+  .celebration-alert {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-left: 4px solid #28a745;
+    animation: slideInFromTop 0.5s ease-out;
+  }
+  
+  .celebration-icon {
+    font-size: 2rem;
+    animation: bounce 1s infinite;
+  }
+  
+  .staking-detail {
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 0.375rem;
+    text-align: center;
+  }
+  
+  @keyframes slideInFromTop {
+    from {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-10px);
+    }
+    60% {
+      transform: translateY(-5px);
+    }
+  }
+  

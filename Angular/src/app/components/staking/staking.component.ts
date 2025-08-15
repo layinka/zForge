@@ -192,7 +192,7 @@ export class StakingComponent implements OnInit {
       this.toastService.show('Success', 'Tokens staked successfully!');
       
       // Navigate to PTYT details page with route parameters
-      this.router.navigate(['/ptyt', token.address, selectedMat.maturity.toString()]);
+      this.router.navigate(['/details', token.address, selectedMat.maturity.toString(), 'true']);
     } catch (error) {
       console.error('Error depositing token:', error);
       

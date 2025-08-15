@@ -15,8 +15,12 @@ export const routes: Routes = [
     loadComponent: () => import('./components/ptyt/ptyt.component').then(m => m.PtytComponent)
   },
   {
-    path: 'ptyt/:u/:m',
-    loadComponent: () => import('./components/ptyt/ptyt.component').then(m => m.PtytComponent)
+    path: 'details/:u/:m',
+    loadComponent: () => import('./components/ptyt-details/ptyt-details.component').then(m => m.PtYtDetailsComponent)
+  },
+  {
+    path: 'details/:u/:m/:staked',
+    loadComponent: () => import('./components/ptyt-details/ptyt-details.component').then(m => m.PtYtDetailsComponent)
   },
   {
     path: 'pools',

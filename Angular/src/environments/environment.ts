@@ -15,7 +15,7 @@ export interface ChainContracts {
 const ALL_CONTRACTS: Record<number, ChainContracts> = {
   // Hardhat Local Network (Chain ID: 31337)
   31337: {
-    syFactory: '0x0E801D84Fa97b50751Dbf25036d067dCf18858bF', // Will be updated after deployment
+    syFactory: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9', // Will be updated after deployment
     mockStCORE: '0x5FbDB2315678afecb367f032d93F642f64180aa3', // Will be updated after deployment
     ptToken: '0x9f1ac54BEF0DD2f6f3462EA0fa94fC62300d3a8e', // Will be updated after deployment
     ytToken: '0xbf9fBFf01664500A33080Da5d437028b07DFcC55', // Will be updated after deployment
@@ -48,7 +48,8 @@ export const environment = {
   
   // Default chain for development
   defaultChainId: 31337,
-  
+  coingeckoApiKey: 'CG-CvUVFsXvHBaAJ62EHPBpettn',
+  supraOracleAddress: '0xD610347C25f702D2165D827EDB49fF0eb49d3627',
   // Add other development environment variables here
 };
 
