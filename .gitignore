@@ -1,3 +1,4 @@
 /Angular/src/environments/environment.prod.ts
 /Contracts/typechain-types
 /Contracts/deployments/core_testnet2/old
+/Contracts/deployments/localhost
